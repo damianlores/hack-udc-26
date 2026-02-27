@@ -62,3 +62,8 @@ Paso	Acción Técnica
     Desktop Environment: Asegúrate de que tu interfaz sea compatible con Wayland y X11.
 
     Empaquetado: Usa Flatpak o AppImage para que tu aplicación funcione en Ubuntu, Fedora y Arch sin problemas de dependencias.
+
+
+
+
+   analisis de optiizacion de ordenador con ia con una interfaz q interprete los datos y a partir del historial tb haga sugerencias, q a partir de los datos: cpu... y de las aplicaciones q estan abiertas te diga si  es normal ese gasto o comportamiento con graficas ; ahora dime como hago esto para una aplicacion en linux dime paso a paso q tengo q hacer para implementar TODO esto de 0
