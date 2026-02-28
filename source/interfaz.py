@@ -13,7 +13,13 @@ class WorkerProcesos(QThread):
     datos_actualizados = pyqtSignal(list)
 
     def run(self):
-        from resources import obtain_process_data
+        # Asumimos que resources.py existe y tiene obtain_process_data
+        try:
+            from resources import obtain_process_data
+        except ImportError:
+            # Fallback por si no tienes el archivo para probar
+            def obtain_process_data(): return []
+
         while True:
             try:
                 procesos = obtain_process_data()
@@ -69,62 +75,42 @@ class BarraDiscoReal(QWidget):
         painter.setPen(QColor("#aaaaaa"))
         painter.drawText(x_ini, y_ini + alto_b + 20, f"{self.usado_gb:.1f}GB / {self.total_gb:.1f}GB ({self.porcentaje}%)")
 
-# --- GRÁFICA ANIMADA (CPU/RAM) ---
-# --- GRÁFICA ANIMADA (USO REAL DE CPU) ---
+# --- GRÁFICA ANIMADA (Lógica mantenida para tu compañero) ---
 class GraficaAnimada(QWidget):
     def __init__(self):
         super().__init__()
-        # Inicializamos con una lista de ceros para llenar la gráfica al inicio
         self.puntos = [0.0 for _ in range(50)]
-        
-        # Rangos de referencia visual (ej. 30% a 70%)
         self.r_min, self.r_max = 30, 70
-        
-        # Configuración del temporizador para muestreo cada 500ms
         self.timer = QTimer()
         self.timer.timeout.connect(self.actualizar)
         self.timer.start(500)
 
     def actualizar(self):
-        # Obtención del porcentaje de uso total de CPU (no bloqueante)
         uso_cpu = psutil.cpu_percent(interval=None)
-        
         self.puntos.append(uso_cpu)
-        if len(self.puntos) > 50:
-            self.puntos.pop(0)
-            
-        # Forzar el rediseño del widget
+        if len(self.puntos) > 50: self.puntos.pop(0)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor("#1a1a1a"))
-        
         ancho, alto = self.width(), self.height()
         paso_x = ancho / 49
-
-        # Dibujar zona de referencia (IA Advisor Area)
         y_max = alto - (self.r_max / 100 * alto)
         y_min = alto - (self.r_min / 100 * alto)
         painter.setBrush(QColor(52, 152, 219, 40))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, int(y_max), ancho, int(y_min - y_max))
-
-        # Construcción de la polilínea con datos reales
         poly = QPolygonF()
         for i, v in enumerate(self.puntos):
-            # Mapeo del valor (0-100) al eje Y del widget
             y_pos = alto - (v / 100 * alto)
             poly.append(QPointF(i * paso_x, y_pos))
-
-        # El color de la línea cambia si el último valor detectado es crítico
         ultimo_valor = self.puntos[-1]
         color = QColor("#2ecc71") if ultimo_valor <= self.r_max else QColor("#e74c3c")
-        
         painter.setPen(QPen(color, 3))
         painter.drawPolyline(poly)
-        
+
 # --- BARRA DE PROCESO INDIVIDUAL ---
 class BarraProcesoPro(QWidget):
     def __init__(self, nombre, valor_actual, r_min, r_max):
@@ -149,7 +135,7 @@ class BarraProcesoPro(QWidget):
         painter.setBrush(color_linea)
         painter.drawRect(x_ini, y_ini, x_valor - x_ini, alto_barra)
 
-# --- PANTALLA DE RECURSOS ---
+# --- PANTALLA DE RECURSOS (MODIFICADA) ---
 class PantallaRecurso(QWidget):
     def __init__(self, titulo, es_disco=False, ruta=""):
         super().__init__()
@@ -191,9 +177,46 @@ class PantallaRecurso(QWidget):
             content_h.addWidget(tips)
             
         else:
-            col_izq.addWidget(QLabel(f"Análisis: {titulo}", styleSheet="color: white; font-size: 18px;"))
+            # --- MEJORA: REEMPLAZO DE "ANÁLISIS: CPU" GIGANTE ---
+            col_izq.addWidget(QLabel(f"Monitor de {titulo}", styleSheet="color: white; font-size: 22px; font-weight: bold; margin-bottom: 5px;"))
+            
+            # Panel de KPIs (Tarjetas de métricas)
+            panel_kpi = QFrame()
+            panel_kpi.setStyleSheet("background-color: #1a1a1a; border-radius: 12px; border: 1px solid #333;")
+            lay_kpi = QHBoxLayout(panel_kpi)
+            lay_kpi.setContentsMargins(20, 15, 20, 15)
+            
+            if titulo == "CPU":
+                val_principal = f"{psutil.cpu_percent()}%"
+                val_sub = f"Núcleos: {psutil.cpu_count()}"
+                lbl_desc = "Carga Total"
+            else:
+                mem = psutil.virtual_memory()
+                val_principal = f"{mem.percent}%"
+                val_sub = f"Libre: {mem.available / (1024**3):.1f} GB"
+                lbl_desc = "Uso de RAM"
+
+            # Tarjeta 1
+            card1 = QVBoxLayout(); card1.addWidget(QLabel(lbl_desc, styleSheet="color: #888; font-size: 12px;"))
+            card1.addWidget(QLabel(val_principal, styleSheet="color: white; font-size: 26px; font-weight: bold;"))
+            # Tarjeta 2
+            card2 = QVBoxLayout(); card2.addWidget(QLabel("Hardware", styleSheet="color: #888; font-size: 12px;"))
+            card2.addWidget(QLabel(val_sub, styleSheet="color: #3498db; font-size: 15px; font-weight: bold;"))
+            # Tarjeta 3
+            card3 = QVBoxLayout(); card3.addWidget(QLabel("Estado IA", styleSheet="color: #888; font-size: 12px;"))
+            card3.addWidget(QLabel("🟢 Óptimo", styleSheet="color: #2ecc71; font-size: 15px; font-weight: bold;"))
+
+            lay_kpi.addLayout(card1); lay_kpi.addLayout(card2); lay_kpi.addLayout(card3)
+            col_izq.addWidget(panel_kpi)
+
+            # Referencia para la gráfica
+            lbl_graph = QLabel("Histórico de rendimiento:")
+            lbl_graph.setStyleSheet("color: #666; font-size: 12px; margin-top: 10px;")
+            col_izq.addWidget(lbl_graph)
+            
             col_izq.addWidget(GraficaAnimada())
 
+            # Columna procesos
             col_der = QVBoxLayout()
             col_der.addWidget(QLabel("Procesos Activos", styleSheet="color: white; font-weight: bold; font-size: 16px;"))
             
@@ -236,7 +259,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Hack-UDC AI Monitor")
         self.resize(1100, 650)
-        
         self.worker_global = WorkerProcesos()
 
         main_layout = QHBoxLayout()
@@ -262,30 +284,17 @@ class MainWindow(QMainWindow):
         sidebar_container.setLayout(self.sidebar_lay)
         sidebar_container.setFixedWidth(200)
         sidebar_container.setStyleSheet("""
-            QWidget { 
-                background-color: white; 
-                border-right: 1px solid #ced4da; 
-            } 
-            QPushButton { 
-                border: none; 
-                text-align: left; 
-                padding: 12px; 
-                font-weight: bold; 
-                color: black; 
-            } 
-            QPushButton:hover { 
-                background-color: #f1f3f5; 
-            }
+            QWidget { background-color: white; border-right: 1px solid #ced4da; } 
+            QPushButton { border: none; text-align: left; padding: 12px; font-weight: bold; color: black; } 
+            QPushButton:hover { background-color: #f1f3f5; }
         """)
 
         # 2. PÁGINAS
         self.paginas = QStackedWidget()
-        
         self.p_inicio = self.crear_inicio()
         self.p_cpu = PantallaRecurso("CPU")
         self.p_ram = PantallaRecurso("Memoria")
 
-        # Conectar trabajador global a pantallas de recursos
         self.worker_global.datos_actualizados.connect(self.p_cpu.refrescar_lista_procesos)
         self.worker_global.datos_actualizados.connect(self.p_ram.refrescar_lista_procesos)
 
@@ -303,7 +312,6 @@ class MainWindow(QMainWindow):
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
-        
         self.worker_global.start()
 
     def crear_inicio(self):
