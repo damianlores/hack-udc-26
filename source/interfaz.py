@@ -70,35 +70,61 @@ class BarraDiscoReal(QWidget):
         painter.drawText(x_ini, y_ini + alto_b + 20, f"{self.usado_gb:.1f}GB / {self.total_gb:.1f}GB ({self.porcentaje}%)")
 
 # --- GRÁFICA ANIMADA (CPU/RAM) ---
+# --- GRÁFICA ANIMADA (USO REAL DE CPU) ---
 class GraficaAnimada(QWidget):
-    def __init__(self, r_min=30, r_max=60):
+    def __init__(self):
         super().__init__()
-        self.puntos = [random.randint(r_min, r_max) for _ in range(50)]
-        self.r_min, self.r_max = r_min, r_max
+        # Inicializamos con una lista de ceros para llenar la gráfica al inicio
+        self.puntos = [0.0 for _ in range(50)]
+        
+        # Rangos de referencia visual (ej. 30% a 70%)
+        self.r_min, self.r_max = 30, 70
+        
+        # Configuración del temporizador para muestreo cada 500ms
         self.timer = QTimer()
         self.timer.timeout.connect(self.actualizar)
         self.timer.start(500)
+
     def actualizar(self):
-        self.puntos.append(random.randint(10, 90))
-        if len(self.puntos) > 50: self.puntos.pop(0)
+        # Obtención del porcentaje de uso total de CPU (no bloqueante)
+        uso_cpu = psutil.cpu_percent(interval=None)
+        
+        self.puntos.append(uso_cpu)
+        if len(self.puntos) > 50:
+            self.puntos.pop(0)
+            
+        # Forzar el rediseño del widget
         self.update()
+
     def paintEvent(self, event):
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor("#1a1a1a"))
+        
         ancho, alto = self.width(), self.height()
         paso_x = ancho / 49
-        y_max = alto - (self.r_max/100*alto)
-        y_min = alto - (self.r_min/100*alto)
-        painter.setBrush(QColor(52, 152, 219, 50))
+
+        # Dibujar zona de referencia (IA Advisor Area)
+        y_max = alto - (self.r_max / 100 * alto)
+        y_min = alto - (self.r_min / 100 * alto)
+        painter.setBrush(QColor(52, 152, 219, 40))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(0, int(y_max), ancho, int(y_min-y_max))
+        painter.drawRect(0, int(y_max), ancho, int(y_min - y_max))
+
+        # Construcción de la polilínea con datos reales
         poly = QPolygonF()
         for i, v in enumerate(self.puntos):
-            poly.append(QPointF(i * paso_x, alto - (v/100*alto)))
-        color = QColor("#2ecc71") if self.r_min <= self.puntos[-1] <= self.r_max else QColor("#e74c3c")
+            # Mapeo del valor (0-100) al eje Y del widget
+            y_pos = alto - (v / 100 * alto)
+            poly.append(QPointF(i * paso_x, y_pos))
+
+        # El color de la línea cambia si el último valor detectado es crítico
+        ultimo_valor = self.puntos[-1]
+        color = QColor("#2ecc71") if ultimo_valor <= self.r_max else QColor("#e74c3c")
+        
         painter.setPen(QPen(color, 3))
         painter.drawPolyline(poly)
-
+        
 # --- BARRA DE PROCESO INDIVIDUAL ---
 class BarraProcesoPro(QWidget):
     def __init__(self, nombre, valor_actual, r_min, r_max):
