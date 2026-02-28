@@ -26,5 +26,4 @@ replay_pid*
 # temp
 __pycache__/
 *.db
-.venv/
-/Users/albabertoalema/Desktop/repo/hack-udc-26/.venv
+.venv
