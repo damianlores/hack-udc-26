@@ -4,7 +4,7 @@ import time
 
 def obtain_process_data():
 
-    attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'create_time', 'memory_info']
+    attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'memory_info', 'create_time']
     active_processes = list(psutil.process_iter(attributes))
     
     for proc in active_processes:
@@ -13,7 +13,7 @@ def obtain_process_data():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
             
-    time.sleep(0.5)
+    time.sleep(1)
     
     processes = []
     
@@ -21,7 +21,7 @@ def obtain_process_data():
         try:
             info = proc.info
             
-            cpu_usage = proc.cpu_percent(interval=None) # / core_count
+            cpu_usage = proc.cpu_percent(interval=None)
             
             creation_time = datetime.datetime.fromtimestamp(info['create_time']).strftime("%Y-%m-%d %H:%M:%S")
             
@@ -29,17 +29,16 @@ def obtain_process_data():
             
             processes.append({
                 "pid": info['pid'],
-                "nombre": info['name'],
-                "cpu": round(cpu_usage, 2),
-                "memoria_porcentaje": round(info['memory_percent'], 2) if info['memory_percent'] else 0.0,
-                "memoria_mb": round(memoria_mb, 2),
-                "fecha_creacion": creation_time
+                "name": info['name'],
+                "cpu_percent": round(cpu_usage, 2),
+                "mem_percent": round(info['memory_percent'], 2) if info['memory_percent'] else 0.0,
+                "mem_mb": round(memoria_mb, 2),
+                "creation_time": creation_time
             })
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
             
     # Ordenar procesos por uso de CPU (mayor a menor)
-    processes.sort(key=lambda x: x['cpu'], reverse=True)
+    processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
             
     return processes
-
