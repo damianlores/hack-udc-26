@@ -68,10 +68,10 @@ def obtain_process_data():
 
 
 class ResourceHistoric:
-    def __init__(self, capacidad=5):
+    def __init__(self, capacity=5):
         # Mantiene el historial de muestreos
-        self.samples = deque(maxlen=capacidad)
-        self.capacity = capacidad
+        self.samples = deque(maxlen=capacity)
+        self.capacity = capacity
 
     def save_sample(self, processes):
         """Guarda los 10 procesos actuales en el historial."""
@@ -85,16 +85,17 @@ class ResourceHistoric:
         """Verifica si ya tenemos los 5 samples requeridos."""
         return len(self.samples) == self.capacity
 
-    def formatear_para_ia(self):
+    def build_samples(self):
         """Genera el texto estructurado para el prompt."""
-        texto = f""
+        text = f""
         for i, m in enumerate(self.samples):
-            texto += f"\nSample {i+1} [{m['timestamp']}]:\n"
-            # Incluye los 10 procesos recopilados por save_process_data
+            text += f"\nSample {i+1} [{m['timestamp']}]:\n"
+            
             for p in m['procesos']:
-                texto += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_percent']}MB\n"
+                text += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_percent']}MB\n"
+            # cleanup after building the text to avoid keeping old samples in memory
             self.samples = []
-        return texto
+        return text
 
 
     """
