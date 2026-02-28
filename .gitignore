@@ -27,3 +27,4 @@ replay_pid*
 __pycache__/
 *.db
 .venv
+.env
