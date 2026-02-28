@@ -44,7 +44,7 @@ class WorkerEscaneo(QThread):
                         archivos_grandes.append((size, f))
                     except: continue
                 if len(archivos_grandes) > 1000: break 
-            top_5 = heapq.nlargest(5, archivos_grandes)
+            top_5 = heapq.nlargest(10, archivos_grandes)
             self.finalizado.emit(top_5)
         except: self.finalizado.emit([])
 
