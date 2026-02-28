@@ -1,69 +1,50 @@
-# hack-udc-26
+Sistema Inteligente de Monitoreo de Recursos con Análisis de Comportamiento Mediante IA
 
-1. Captura de Datos (El Backend de Telemetría)
+INTRODUCCIÓN
 
-En Linux, la fuente de la verdad es el sistema de archivos /proc. Necesitas un "daemon" (servicio en segundo plano) que recolecte métricas periódicamente.
+El proyecto consiste en una aplicación de escritorio diseñada para la supervisión en tiempo real de los recursos de hardware (CPU, RAM y Almacenamiento). A diferencia de los monitores de sistema convencionales, esta herramienta integra un motor de Inteligencia Artificial (Llama-3.3-70b) para interpretar datos técnicos y ofrecer diagnósticos en lenguaje natural, facilitando la comprensión para usuarios no expertos.
 
-    Lenguaje recomendado: Python (por su ecosistema de IA) o Go/Rust (si buscas máxima eficiencia).
+FUNCIONALIDADES IMPLEMENTADAS
 
-    Herramientas clave:
+El diagnóstico basado en comportamiento, el sistema no juzga procesos de forma aislada. Almacena 5 "samples" antes de realizar una consulta a la IA, lo que permite un análisis basado en la tendencia y no solo en un evento puntual.También se encarga de la gestión de almacenamiento, incluye un trabajador específico (WorkerEscaneo) que analiza las unidades de disco de forma recursiva para identificar los 10 archivos de mayor tamaño, ayudando al usuario a liberar espacio de manera eficiente. Además incluye un sistema de notificaciones inteligentes, cuando el análisis de la IA concluye en un estado crítico, el sistema dispara una notificación de escritorio automática para alertar al usuario incluso si la aplicación está en segundo plano.
 
-        psutil: Biblioteca estándar para obtener uso de CPU, RAM, disco y procesos activos.
+ARQUITECTURA DE SOFTWARE
 
-        GPUtil: Para métricas de tarjetas NVIDIA.
-
-    Qué recolectar: Porcentaje de carga por núcleo, temperatura, frecuencia del reloj, memoria swap y, crucialmente, la lista de aplicaciones abiertas (PID y nombre).
-
-2. Almacenamiento e Historial (La Base de Datos)
-
-Para que la IA haga sugerencias basadas en el pasado, necesitas guardar los datos sin saturar el disco.
-
-    Estrategia: Usa una Base de Datos de Series Temporales (TSDB) como InfluxDB o una ligera como SQLite.
-
-    Estructura:
-
-        Timestamp | App_Name | CPU_Usage | RAM_Usage | Context (ej. "enchufado", "batería").
-
-3. El Cerebro: Motor de Análisis con IA
-
-Aquí es donde determinas si un comportamiento es "normal". No uses reglas fijas (ej. "si CPU > 80%"); usa Detección de Anomalías.
-
-    Entrenamiento: Usa algoritmos de aprendizaje no supervisado como Isolation Forest o LSTM (Long Short-Term Memory) si quieres predecir tendencias futuras.
-
-    Lógica de "Normalidad":
-
-        La IA compara el consumo actual de firefox con su media histórica.
-
-        Si firefox consume el 90% de la CPU pero solo tienes una pestaña de texto abierta, la IA marca una anomalía.
-
-    Sugerencias: Basándote en el historial, la IA puede detectar que todos los martes a las 10:00 el sistema se ralentiza por un cron job y sugerir reprogramarlo.
-
-4. La Interfaz Gráfica (Visualización)
-
-Para interpretar los datos con gráficas en Linux de forma moderna:
-
-    Framework: PyQt6 o Tkinter (Python), o si prefieres algo web-desktop, Electron o Tauri.
-
-    Librerías de Gráficas: Plotly o Chart.js. Son excelentes para mostrar líneas de tiempo dinámicas donde el usuario puede ver los picos de consumo.
-
-    Dashboard: Debe mostrar el "Score de Salud" del sistema y una lista de "Insights" (ej. "Slack está consumiendo un 20% más de lo habitual, ¿desea reiniciarlo?").
-
-5. Implementación Paso a Paso (Roadmap)
-Paso	Acción Técnica
-1	Crea un script en Python que use psutil para imprimir en consola el uso de CPU cada 5 segundos.
-2	Implementa una base de datos SQLite para guardar esos datos junto con el nombre del proceso más pesado.
-3	Integra un modelo de Scikit-Learn (IsolationForest) que se entrene con los primeros 30 minutos de datos para definir qué es "normal".
-4	Diseña una ventana básica en PyQt que lea la base de datos y muestre un gráfico de líneas.
-5	Añade un sistema de notificaciones (libnotify en Linux) para las alertas de la IA.
-6. Consideraciones de Linux
-
-    Permisos: Algunos datos de hardware requieren privilegios de root.
-
-    Desktop Environment: Asegúrate de que tu interfaz sea compatible con Wayland y X11.
-
-    Empaquetado: Usa Flatpak o AppImage para que tu aplicación funcione en Ubuntu, Fedora y Arch sin problemas de dependencias.
+La aplicación sigue un diseño modular dividido en cuatro componentes críticos: la gestión de Interfaz (GUI) desarrollada con PyQt6, con multithreading que utiliza hilos secundarios (QThread) para la recolección de datos y el análisis de IA, evitando el bloqueo de la interfaz de usuario (UI) durante operaciones pesadas, también contene visualización dinámica incluye gráficas animadas que se actualizan cada 500ms para mostrar la fluctuación de carga de CPU y Memoria; Recolección de Métricas (resources.py) utilizando la librería psutil para la recopilación de métricas del sistema operativo; Análisis de Procesos filtrando y ordenando los 10 procesos con mayor consumo de recursos; por ultimo un historial de alertas, el cual recoge las últimas 10 alertas.
 
 
 
 
-   analisis de optiizacion de ordenador con ia con una interfaz q interprete los datos y a partir del historial tb haga sugerencias, q a partir de los datos: cpu... y de las aplicaciones q estan abiertas te diga si  es normal ese gasto o comportamiento con graficas ; ahora dime como hago esto para una aplicacion en linux dime paso a paso q tengo q hacer para implementar TODO esto de 0
+
+
+2.3. Motor de Inteligencia Artificial (ai.py)
+
+El núcleo de análisis utiliza el modelo Llama-3.3-70b-versatile a través de la infraestructura de Groq.
+
+    Contextualización: La IA recibe un bloque de datos que incluye intervalos de tiempo y uso de recursos, permitiéndole distinguir entre un pico de uso normal y un comportamiento sospechoso.
+
+    Reglas de Negocio: El sistema está instruido para evitar tecnicismos y emitir una palabra clave (ALERTA:) cuando detecta anomalías graves.
+
+3. Especificaciones Técnicas
+Componente	Tecnología / Librería	Función
+Lenguaje	Python 3.x	Base del desarrollo.
+Frontend	PyQt6	Interfaz gráfica y hilos de ejecución.
+Métricas	psutil	Extracción de datos de CPU, RAM y disco.
+IA Engine	OpenAI SDK (Groq Cloud)	Procesamiento de lenguaje natural y diagnóstico.
+Notificaciones	plyer	Alertas nativas del sistema operativo.
+
+5. Lógica de Flujo de Datos
+
+    Inicio: El MainWindow lanza los hilos de monitoreo.
+
+    Captura: obtain_process_data extrae los procesos actuales.
+
+    Histórico: Los datos se acumulan en ResourceHistoric hasta completar 5 muestras.
+
+    Inferencia: Se envía el historial a la API de Groq con un prompt de experto en sistemas.
+
+    Feedback: La respuesta de la IA se muestra en la interfaz y, si es necesario, se emite una alerta sonora o visual.
+
+6. Conclusión
+
+Este trabajo representa una solución integral que combina la potencia del monitoreo de bajo nivel en Python con las capacidades interpretativas de los modelos de lenguaje de gran escala (LLMs). La arquitectura garantiza fluidez mediante el uso de hilos concurrentes y proporciona una experiencia de usuario simplificada para una tarea tradicionalmente técnica.
