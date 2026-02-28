@@ -63,7 +63,7 @@ def obtain_process_data():
     return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
 
 class ResourceHistoric:
-    def __init__(self, capacity=5):
+    def __init__(self, capacity):
         # initializes a set of samples with a maximum capacity
         self.samples = deque(maxlen=capacity)
         self.capacity = capacity

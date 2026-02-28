@@ -1,60 +1,65 @@
-from collections import deque
 import sys
 import psutil
 import datetime
 import os
 import heapq
 from dotenv import load_dotenv
+from plyer import notification
+from collections import deque
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
                              QVBoxLayout, QLabel, QPushButton, QStackedWidget, 
                              QFrame, QScrollArea, QTextEdit, QDialog)
 from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QPolygonF
 
-from plyer import notification  # <--- Para las notificaciones de Windows/Linux
-
-# --- HILO GLOBAL DE PROCESOS ---
 class WorkerProcesses(QThread):
-    processes_data = pyqtSignal(list, str, str) # Lista de procesos + mensaje IA
+    
+    # Process list, AI generated response and the full historic text fo popup
+    processes_data = pyqtSignal(list, str, str)
     
     def __init__(self, api_key):
         super().__init__()
+        # set the API key for the worker to use in AI analysis
         self.api_key = api_key
+        # max 10 entries of historic AI responses
         self.historic_ai = deque(maxlen=10)
 
     def run(self):
         from resources import obtain_process_data, save_process_data, ResourceHistoric
         from ai import analyze_samples
         
-        historic = ResourceHistoric(capacity=5)
+        resource_historic = ResourceHistoric(capacity=5)
         context = "Sin contexto previo."
         message = "Recopilando datos para análisis de comportamiento..."
-        historic_text = ""  # Variable para almacenar el historial de alertas de IA
+        response_historic = ""
 
         while True:
             try:
-                # 1. Obtener datos ligeros para las barras de la interfaz
+                # "light" data used for UI updates (top 10 processes)
                 processes_ui = obtain_process_data()
-                # 2. Obtener datos detallados para el análisis de la IA
+                # data collection for AI analysis
                 processes_ai = save_process_data()
-                historic.save_sample(processes_ai[:10])
+                # call sample saving method of ResourceHistoric to store the current top 10 processes for AI analysis
+                resource_historic.save_sample(processes_ai[:10])
                 
-                # 3. Procesar bloque de IA si el historial está lleno (5 muestras)
-                if historic.is_ready():
-                    samples = historic.build_samples()
-                    # La función build_samples debe limpiar el historial tras generar el texto
+                # process historic of samples when ready (capacity reached)
+                if resource_historic.is_ready():
+                    # create sample set to send with AI prompt
+                    samples = resource_historic.build_samples()
+                
+                    # build AI analysis
                     response = analyze_samples(context, samples, self.api_key)
-                    context = response
+                    context = response  # save context for next analysis to create a chain of insights based on behavior evolution
                     message = response
                     
-                    # Generar timestamp y guardar en el deque
+                    # get timestamp for response historic and join
                     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
                     self.historic_ai.append(f"[{timestamp}] {response}")
                     
-                    # Unir el historial completo para el popup
-                    historic_text = "\n\n---\n\n".join(reversed(self.historic_ai))
+                    # append joinage to full historic (popup)
+                    response_historic = "\n\n---\n\n".join(reversed(self.historic_ai))
 
-                    # Lógica de notificación de sistema ante alertas
+                    # notification system (detect ALERTA keyword in AI response to trigger a desktop notification, this is a simple implementation that can be expanded with more complex rules based on the content of the message)
                     if "ALERTA:" in message.upper():
                         from plyer import notification
                         try:
@@ -66,17 +71,16 @@ class WorkerProcesses(QThread):
                         except:
                             pass
 
-                # 4. Emitir datos a la interfaz gráfica
-                self.processes_data.emit(processes_ui, message, historic_text)
+                # emit signal with the data for UI update, AI message and full historic for popup
+                self.processes_data.emit(processes_ui, message, response_historic)
                 
             except Exception as e:
                 print(f"Error en WorkerProcesos: {e}")
             
-            # Pausa ajustada para compensar el tiempo de muestreo de save_process_data
             self.msleep(5000)
 
-# --- HILO PARA ESCANEAR ARCHIVOS PESADOS ---
-class WorkerEscaneo(QThread):
+# Thread for big files scan
+class WorkerScan(QThread):
     finished = pyqtSignal(list)
     def __init__(self, ruta):
         super().__init__()
@@ -97,157 +101,152 @@ class WorkerEscaneo(QThread):
             self.finished.emit(top_5)
         except: self.finished.emit([])
 
-# --- COMPONENTE: BARRA DE DISCO REAL ---
-class BarraDiscoReal(QWidget):
-    def __init__(self, ruta):
+# disk bar widget
+class bar_disk(QWidget):
+    def __init__(self, path):
         super().__init__()
-        self.ruta = ruta
+        self.path = path
         self.setMinimumHeight(100)
         try:
-            uso = psutil.disk_usage(self.ruta)
-            self.total_gb = uso.total / (1024**3)
-            self.usado_gb = uso.used / (1024**3)
-            self.porcentaje = uso.percent
+            usage = psutil.disk_usage(self.path)
+            self.total_gb = usage.total / (1024**3)
+            self.used_gb = usage.used / (1024**3)
+            self.percentage = usage.percent
         except:
-            self.total_gb, self.usado_gb, self.porcentaje = 0, 0, 0
+            self.total_gb, self.used_gb, self.percentage = 0, 0, 0
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        ancho, x_ini, y_ini, alto_b = self.width() - 40, 20, 40, 25
+        width, x_ini, y_ini, height_b = self.width() - 40, 20, 40, 25
         painter.setBrush(QColor("#333333"))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(x_ini, y_ini, ancho, alto_b)
+        painter.drawRect(x_ini, y_ini, width, height_b)
         painter.setBrush(QColor("#9b59b6")) 
-        painter.drawRect(x_ini, y_ini, int((self.porcentaje/100)*ancho), alto_b)
+        painter.drawRect(x_ini, y_ini, int((self.percentage/100)*width), height_b)
         painter.setPen(QColor("white"))
-        painter.drawText(x_ini, 30, f"Almacenamiento: {self.ruta}")
+        painter.drawText(x_ini, 30, f"Almacenamiento: {self.path}")
         painter.setPen(QColor("#aaaaaa"))
-        painter.drawText(x_ini, y_ini + alto_b + 20, f"{self.usado_gb:.1f}GB / {self.total_gb:.1f}GB ({self.porcentaje}%)")
+        painter.drawText(x_ini, y_ini + height_b + 20, f"{self.used_gb:.1f}GB / {self.total_gb:.1f}GB ({self.percentage}%)")
 
-# --- GRÁFICA ANIMADA ---
+# graph widget for CPU and RAM
 class GraficaAnimada(QWidget):
     def __init__(self, tipo="CPU"):
         super().__init__()
         self.tipo = tipo
-        self.puntos = [0.0 for _ in range(50)]
+        self.points = [0.0 for _ in range(50)]
         self.r_min, self.r_max = 30, 70
         self.timer = QTimer()
         self.timer.timeout.connect(self.actualizar)
-        self.timer.start(500)
+        self.timer.start(1000)
 
     def actualizar(self):
-        # Las gráficas consultan directamente psutil para evitar latencia
         if self.tipo == "CPU":
-            valor = psutil.cpu_percent(interval=None)
+            value = psutil.cpu_percent(interval=None)
         else:
-            valor = psutil.virtual_memory().percent
+            value = psutil.virtual_memory().percent
             
-        self.puntos.append(valor)
-        if len(self.puntos) > 50: self.puntos.pop(0)
+        self.points.append(value)
+        if len(self.points) > 50: self.points.pop(0)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor("#1a1a1a"))
-        ancho, alto = self.width(), self.height()
-        paso_x = ancho / 49
-        y_max, y_min = alto - (self.r_max/100*alto), alto - (self.r_min/100*alto)
+        width, height = self.width(), self.height()
+        paso_x = width / 49
+        y_max, y_min = height - (self.r_max/100*height), height - (self.r_min/100*height)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(0, int(y_max), ancho, int(y_min - y_max))
+        painter.drawRect(0, int(y_max), width, int(y_min - y_max))
         poly = QPolygonF()
-        for i, v in enumerate(self.puntos):
-            poly.append(QPointF(i * paso_x, alto - (v / 100 * alto)))
-        color = QColor("#2ecc71") if self.puntos[-1] <= self.r_max else QColor("#e74c3c")
+        for i, v in enumerate(self.points):
+            poly.append(QPointF(i * paso_x, height - (v / 100 * height)))
+        color = QColor("#2ecc71") if self.points[-1] <= self.r_max else QColor("#e74c3c")
         painter.setPen(QPen(color, 3))
         painter.drawPolyline(poly)
         
-# --- BARRA DE PROCESO INDIVIDUAL ---
+# individual process bar widget
 class BarraProcesoPro(QWidget):
-    def __init__(self, nombre, valor_actual, r_min, r_max):
+    def __init__(self, name, value, r_min, r_max):
         super().__init__()
-        self.nombre, self.valor, self.r_min, self.r_max = nombre, valor_actual, r_min, r_max
+        self.nombre, self.value, self.r_min, self.r_max = name, value, r_min, r_max
         self.setMinimumHeight(50)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        ancho = self.width() - 40
-        alto_barra = 15
+        width = self.width() - 40
+        bar_height = 15
         x_ini, y_ini = 10, 30
-        esta_dentro = self.valor <= self.r_max
-        color_linea = QColor("#2ecc71") if esta_dentro else QColor("#e74c3c")
+        in_range = self.value <= self.r_max
+        color_line = QColor("#2ecc71") if in_range else QColor("#e74c3c")
         painter.setPen(QColor("white"))
-        painter.drawText(x_ini, 20, f"{self.nombre}: {self.valor}%")
+        painter.drawText(x_ini, 20, f"{self.nombre}: {self.value}%")
         painter.setBrush(QColor("#333333"))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(x_ini, y_ini, ancho, alto_barra)
-        x_valor = x_ini + int((min(self.valor, 100) / 100) * ancho)
-        painter.setBrush(color_linea)
-        painter.drawRect(x_ini, y_ini, x_valor - x_ini, alto_barra)
+        painter.drawRect(x_ini, y_ini, width, bar_height)
+        x_valor = x_ini + int((min(self.value, 100) / 100) * width)
+        painter.setBrush(color_line)
+        painter.drawRect(x_ini, y_ini, x_valor - x_ini, bar_height)
 
-# --- PANTALLA DE RECURSOS ---
+# resource screen
 class ScreenResource(QWidget):
-    def __init__(self, titulo, es_disco=False, ruta=""):
+    def __init__(self, title, is_disk=False, path=""):
         super().__init__()
-        self.titulo = titulo
+        self.title = title
         self.setStyleSheet("background-color: #0b0b0b;")
-        layout_principal = QVBoxLayout(self)
+        layout_main = QVBoxLayout(self)
         
         content_h = QHBoxLayout()
         col_izq = QVBoxLayout()
         col_der = QVBoxLayout()
         
-        if es_disco:
-            col_izq.addWidget(BarraDiscoReal(ruta))
-            self.panel_archivos = QFrame()
-            self.panel_archivos.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 10px;")
-            self.lay_arc = QVBoxLayout(self.panel_archivos)
+        if is_disk:
+            col_izq.addWidget(bar_disk(path))
+            self.panel_files = QFrame()
+            self.panel_files.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 10px;")
+            self.lay_arc = QVBoxLayout(self.panel_files)
             self.lbl_load = QLabel("Analizando archivos pesados...")
             self.lbl_load.setStyleSheet("color: #9b59b6;")
             self.lay_arc.addWidget(self.lbl_load)
-            col_izq.addWidget(self.panel_archivos)
+            col_izq.addWidget(self.panel_files)
 
             panel_status = QFrame()
             panel_status.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 10px;")
-            lay_status = QVBoxLayout(panel_status)
-            uso = psutil.disk_usage(ruta).percent
-            txt_status = "ESTADO: ÓPTIMO" if uso < 80 else "ESTADO: CRÍTICO"
-            col_status = "#2ecc71" if uso < 80 else "#e74c3c"
-            msg_status = "Tienes espacio suficiente." if uso < 80 else "Debes vaciar espacio pronto."
+            layout_status = QVBoxLayout(panel_status)
+            usage = psutil.disk_usage(path).percent
+            text_status = "ESTADO: ÓPTIMO" if usage < 80 else "ESTADO: CRÍTICO"
+            color_status = "#2ecc71" if usage < 80 else "#e74c3c"
+            message_status = "Tienes espacio suficiente." if usage < 80 else "Debes vaciar espacio pronto."
             
-            lay_status.addWidget(QLabel(txt_status, styleSheet=f"color: {col_status}; font-weight: bold; font-size: 16px;"))
-            lay_status.addWidget(QLabel(msg_status, styleSheet="color: white;"))
-            lay_status.addStretch()
+            layout_status.addWidget(QLabel(text_status, styleSheet=f"color: {color_status}; font-weight: bold; font-size: 16px;"))
+            layout_status.addWidget(QLabel(message_status, styleSheet="color: white;"))
+            layout_status.addStretch()
             col_der.addWidget(panel_status)
 
-            self.worker_disk = WorkerEscaneo(ruta)
+            self.worker_disk = WorkerScan(path)
             self.worker_disk.finished.connect(self.actualizar_archivos)
             self.worker_disk.start()
         else:            
-            # --- TÍTULO ARRIBA ---
-            lbl_tit = QLabel(f"Monitor: {titulo}")
+            # title label
+            lbl_tit = QLabel(f"Monitor: {title}")
             lbl_tit.setStyleSheet("color: white; font-size: 20px; font-weight: bold; margin-bottom: 5px;")
             lbl_tit.setMaximumHeight(35)
             col_izq.addWidget(lbl_tit)
             
-            # --- PANEL KPI COMPACTO ---
             panel_kpi = QFrame()
             panel_kpi.setStyleSheet("background-color: #1a1a1a; border-radius: 12px; border: 1px solid #333;")
             panel_kpi.setMaximumHeight(80) 
-            lay_kpi = QHBoxLayout(panel_kpi)
-            lay_kpi.setContentsMargins(15, 5, 15, 5) 
+            layout_kpi = QHBoxLayout(panel_kpi)
+            layout_kpi.setContentsMargins(15, 5, 15, 5) 
 
-            # Creamos las etiquetas vacías primero para guardarlas como atributos
             self.lbl_val_principal = QLabel("--")
             self.lbl_val_hardware = QLabel("--")
             self.lbl_val_uptime = QLabel("--")
             
-            # Etiquetas de descripción
-            lbl_desc_text = "Carga Total" if titulo == "CPU" else "Uso de RAM"
+            lbl_desc_text = "Carga Total" if title == "CPU" else "Uso de RAM"
             
-            # Estructura del panel KPI
             for t_tit, t_widget, t_col in [
                 (lbl_desc_text, self.lbl_val_principal, "white"),
                 ("Hardware", self.lbl_val_hardware, "#3498db"),
@@ -258,13 +257,13 @@ class ScreenResource(QWidget):
                 v_lay.addWidget(QLabel(t_tit, styleSheet="color: #bbb; font-size: 11px;"))
                 t_widget.setStyleSheet(f"color: {t_col}; font-size: 16px; font-weight: bold;")
                 v_lay.addWidget(t_widget)
-                lay_kpi.addLayout(v_lay)
+                layout_kpi.addLayout(v_lay)
                 
             col_izq.addWidget(panel_kpi)
 
-            self.grafica = GraficaAnimada(tipo=titulo)
-            self.grafica.setFixedHeight(180)
-            col_izq.addWidget(self.grafica)
+            self.graph = GraficaAnimada(tipo=title)
+            self.graph.setFixedHeight(180)
+            col_izq.addWidget(self.graph)
             col_izq.addStretch()
 
             # --- COLUMNA DERECHA (PROCESOS) ---
@@ -281,7 +280,7 @@ class ScreenResource(QWidget):
 
         content_h.addLayout(col_izq, stretch=2)
         content_h.addLayout(col_der, stretch=1)
-        layout_principal.addLayout(content_h)
+        layout_main.addLayout(content_h)
 
         # Panel inferior para la IA
         self.panel_ai = QFrame()
@@ -307,7 +306,7 @@ class ScreenResource(QWidget):
         self.label_ai.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         lay_ia.addWidget(self.label_ai)
-        layout_principal.addWidget(self.panel_ai)
+        layout_main.addWidget(self.panel_ai)
 
     def refresh_process_list(self, lista, message):
         if not hasattr(self, 'lay_procesos'): return
@@ -317,7 +316,7 @@ class ScreenResource(QWidget):
         uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
         self.lbl_val_uptime.setText(uptime_str)
 
-        if self.titulo == "CPU":
+        if self.title == "CPU":
             # Usamos interval=None para no bloquear la interfaz
             val_principal = f"{psutil.cpu_percent(interval=None)}%"
             val_hardware = f"{psutil.cpu_count(logical=False)} núcleos / {psutil.cpu_count()} hilos"
@@ -512,7 +511,7 @@ class MainWindow(QMainWindow):
         return w
 
     def disk_window(self, ruta):
-        nueva = ScreenResource(f"Disco {ruta}", es_disco=True, ruta=ruta)
+        nueva = ScreenResource(f"Disco {ruta}", is_disk=True, path=ruta)
         self.pages.addWidget(nueva)
         self.pages.setCurrentWidget(nueva)
         
