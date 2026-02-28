@@ -8,9 +8,14 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout,
 from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QPolygonF
 
+from plyer import notification  # <--- Para las notificaciones de Windows/Linux
+from resources import save_process_data, HistorialBloque # <--- Tus nuevas funciones
+from prompt import analyze_samples # <--- Tu nueva función de IA
+
 # --- HILO GLOBAL DE PROCESOS ---
 class WorkerProcesos(QThread):
     datos_actualizados = pyqtSignal(list)
+  # datos_actualizados = pyqtSignal(list, str) # <--- Ahora acepta dos cosas (lista y texto)
 
     def run(self):
         try:
@@ -282,6 +287,11 @@ class PantallaRecurso(QWidget):
         self.panel_ia = QFrame()
         self.panel_ia.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
         self.panel_ia.setFixedHeight(80)
+       """ lay_ia = QVBoxLayout(self.panel_ia)
+        self.lbl_ia = QLabel("Esperando análisis de comportamiento...")
+        self.lbl_ia.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
+        self.lbl_ia.setWordWrap(True)
+        lay_ia.addWidget(self.lbl_ia)"""
         layout_principal.addWidget(self.panel_ia)
 
     def refrescar_lista_procesos(self, lista):
@@ -292,6 +302,9 @@ class PantallaRecurso(QWidget):
         for p in lista:
             self.lay_procesos.addWidget(BarraProcesoPro(p['name'][:15], p['cpu_percent'], 0, 20))
         self.lay_procesos.addStretch()
+      """# Actualizar el texto de la IA
+        if hasattr(self, 'lbl_ia'):
+            self.lbl_ia.setText(mensaje_ia)"""
 
     def actualizar_archivos(self, lista):
         if hasattr(self, 'lbl_load'): self.lbl_load.deleteLater()
@@ -410,3 +423,7 @@ def init_ui():
 
 if __name__ == "__main__":
     init_ui()
+"""app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec()"""
