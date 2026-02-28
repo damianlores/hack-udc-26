@@ -1,9 +1,8 @@
-"""
 import psutil
 import datetime
 import time
 
-def obtain_process_data():
+def save_process_data():
     attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'memory_info', 'create_time']
     active_processes = list(psutil.process_iter(attributes))
     
@@ -41,8 +40,7 @@ def obtain_process_data():
     processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
             
     return processes
-    """
-import psutil
+
 
 def obtain_process_data():
     """Retorna los 10 procesos con mayor consumo de CPU."""
