@@ -36,7 +36,7 @@ def metric_register(conexion):
     # Inserción en SQLite
     cursor = conexion.cursor()
     cursor.execute('''
-        INSERT INTO historico_metricas (cpu_global, ram_global, total_procesos)
+        INSERT INTO metric_historic (cpu_global, ram_global, total_procesos)
         VALUES (?, ?, ?)
     ''', (cpu, ram, procesos))
     
@@ -45,11 +45,11 @@ def metric_register(conexion):
 
 # --- Ejecución de prueba ---
 if __name__ == "__main__":
-    conn = inicializar_base_datos()
+    conn = init_database()
     
     # Simulación de recolección continua (ejecutar 3 veces)
     for _ in range(3):
-        registrar_metricas(conn)
+        metric_register(conn)
         time.sleep(1)
         
     conn.close()
