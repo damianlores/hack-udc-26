@@ -4,17 +4,15 @@ import datetime
 import os
 import heapq
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                             QVBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame, QScrollArea)
+                             QVBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame, QScrollArea, QTextEdit)
 from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QPolygonF
 
 from plyer import notification  # <--- Para las notificaciones de Windows/Linux
-from resources import save_process_data, ResourceHistoric # <--- Tus nuevas funciones
-from prompt import analyze_samples # <--- Tu nueva función de IA
 
 # --- HILO GLOBAL DE PROCESOS ---
 class WorkerProcesos(QThread):
-    datos_actualizados = pyqtSignal(list, str) # Lista de procesos + mensaje IA
+    processes_data = pyqtSignal(list, str) # Lista de procesos + mensaje IA
 
     def run(self):
         from resources import obtain_process_data, save_process_data, ResourceHistoric
@@ -36,9 +34,9 @@ class WorkerProcesos(QThread):
                 
                 # 3. Procesar bloque de IA si el historial está lleno (5 muestras)
                 if historic.is_ready():
-                    muestras_texto = historic.build_samples()
+                    samples = historic.build_samples()
                     # La función build_samples debe limpiar el historial tras generar el texto
-                    response = analyze_samples(context, muestras_texto)
+                    response = analyze_samples(context, samples)
                     context = response
                     message = response
 
@@ -55,7 +53,7 @@ class WorkerProcesos(QThread):
                             pass
 
                 # 4. Emitir datos a la interfaz gráfica
-                self.datos_actualizados.emit(processes_ui, message)
+                self.processes_data.emit(processes_ui, message)
                 
             except Exception as e:
                 print(f"Error en WorkerProcesos: {e}")
@@ -65,12 +63,12 @@ class WorkerProcesos(QThread):
 
 # --- HILO PARA ESCANEAR ARCHIVOS PESADOS ---
 class WorkerEscaneo(QThread):
-    finalizado = pyqtSignal(list)
+    finished = pyqtSignal(list)
     def __init__(self, ruta):
         super().__init__()
         self.ruta = ruta
     def run(self):
-        archivos_grandes = []
+        big_files = []
         ruta_base = self.ruta if os.path.exists(self.ruta) else os.path.expanduser("~")
         try:
             for root, dirs, files in os.walk(ruta_base):
@@ -78,12 +76,12 @@ class WorkerEscaneo(QThread):
                     try:
                         fp = os.path.join(root, f)
                         size = os.path.getsize(fp)
-                        archivos_grandes.append((size, f))
+                        big_files.append((size, f))
                     except: continue
-                if len(archivos_grandes) > 1000: break 
-            top_5 = heapq.nlargest(10, archivos_grandes)
-            self.finalizado.emit(top_5)
-        except: self.finalizado.emit([])
+                if len(big_files) > 1000: break 
+            top_5 = heapq.nlargest(10, big_files)
+            self.finished.emit(top_5)
+        except: self.finished.emit([])
 
 # --- COMPONENTE: BARRA DE DISCO REAL ---
 class BarraDiscoReal(QWidget):
@@ -211,7 +209,7 @@ class PantallaRecurso(QWidget):
             col_der.addWidget(panel_status)
 
             self.worker_disk = WorkerEscaneo(ruta)
-            self.worker_disk.finalizado.connect(self.actualizar_archivos)
+            self.worker_disk.finished.connect(self.actualizar_archivos)
             self.worker_disk.start()
         else:            
             # --- TÍTULO ARRIBA ---
@@ -274,15 +272,30 @@ class PantallaRecurso(QWidget):
         # Panel inferior para la IA
         self.panel_ai = QFrame()
         self.panel_ai.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
-        self.panel_ai.setFixedHeight(120)
+        self.panel_ai.setFixedHeight(150)
+        
         lay_ia = QVBoxLayout(self.panel_ai)
-        self.lbl_ia = QLabel("Esperando análisis de comportamiento...")
-        self.lbl_ia.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
-        self.lbl_ia.setWordWrap(True)
-        lay_ia.addWidget(self.lbl_ia)
+        
+        self.label_ai = QTextEdit() 
+        self.label_ai.setReadOnly(True) # Impide que el usuario edite el contenido
+        self.label_ai.setPlainText("Esperando análisis de comportamiento...")
+        
+        # 3. Estilo para simular un Label (sin bordes y fondo transparente)
+        self.label_ai.setStyleSheet("""
+            background: transparent; 
+            border: none; 
+            color: #9b59b6; 
+            font-size: 14px; 
+            font-style: italic;
+        """)
+        
+        # Eliminar la barra de desplazamiento horizontal si no es necesaria
+        self.label_ai.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        lay_ia.addWidget(self.label_ai)
         layout_principal.addWidget(self.panel_ai)
 
-    def refrescar_lista_procesos(self, lista, message):
+    def refresh_process_list(self, lista, message):
         if not hasattr(self, 'lay_procesos'): return
         
         # --- 1. ACTUALIZAR PANEL KPI ---
@@ -312,12 +325,12 @@ class PantallaRecurso(QWidget):
         self.lay_procesos.addStretch()
         
         # --- 3. ACTUALIZAR TEXTO DE LA IA ---
-        if hasattr(self, 'lbl_ia'):
-            self.lbl_ia.setText(message)
+        if hasattr(self, 'label_ai'):
+            self.label_ai.setPlainText(message)
             if "ALERTA:" in message.upper():
-                self.lbl_ia.setStyleSheet("color: #ff4c4c; font-size: 14px; font-weight: bold;")
+                self.label_ai.setStyleSheet("color: #ff4c4c; font-size: 14px; font-weight: bold;")
             else:
-                self.lbl_ia.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
+                self.label_ai.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
 
     def actualizar_archivos(self, lista):
         if hasattr(self, 'lbl_load'): self.lbl_load.deleteLater()
@@ -372,8 +385,8 @@ class MainWindow(QMainWindow):
         self.p_cpu = PantallaRecurso("CPU")
         self.p_ram = PantallaRecurso("Memoria")
 
-        self.worker_global.datos_actualizados.connect(self.p_cpu.refrescar_lista_procesos)
-        self.worker_global.datos_actualizados.connect(self.p_ram.refrescar_lista_procesos)
+        self.worker_global.processes_data.connect(self.p_cpu.refresh_process_list)
+        self.worker_global.processes_data.connect(self.p_ram.refresh_process_list)
 
         self.paginas.addWidget(self.p_inicio)
         self.paginas.addWidget(self.p_cpu)
@@ -428,10 +441,3 @@ def init_ui():
      app = QApplication(sys.argv)
      w = MainWindow(); w.show()
      sys.exit(app.exec())
-
-if __name__ == "__main__":
-    init_ui()
-"""app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec()"""
