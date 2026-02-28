@@ -49,7 +49,7 @@ class WorkerProcesos(QThread):
                             notification.notify(
                                 title='Monitor de Sistema',
                                 message=message[:100],
-                                timeout=5
+                                timeout=10
                             )
                         except:
                             pass
@@ -416,11 +416,6 @@ class MainWindow(QMainWindow):
         lbl_inicio.setWordWrap(True)
         layout_ini.addWidget(lbl_inicio)
         layout_ini.addStretch()
-
-        panel_ia_inicio = QFrame()
-        panel_ia_inicio.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
-        panel_ia_inicio.setFixedHeight(100)
-        layout_ini.addWidget(panel_ia_inicio)
         
         return w
 
