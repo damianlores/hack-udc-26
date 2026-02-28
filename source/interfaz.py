@@ -91,20 +91,31 @@ class MainWindow(QMainWindow):
         # 2. CONTENEDOR DE PÁGINAS (Stacked Widget)
         self.paginas = QStackedWidget()
         
-        # Pagina de Inicio
+        # --- MODIFICACIÓN 2: INICIO MODO OSCURO ---
         self.p_inicio = QWidget()
+        self.p_inicio.setStyleSheet("background-color: black;") # Fondo negro para toda la página
+        
         layout_ini = QVBoxLayout()
-        texto_ini = QLabel("<h2>Bienvenido al Monitor de Salud con IA</h2>"
-                           "<p>Este programa recolecta métricas del sistema (/proc).</p>"
-                           "<ul>"
-                           "<li><b>Análisis:</b> Compara el uso actual con tu media histórica.</li>"
-                           "<li><b>Detección:</b> Marca anomalías en rojo si el consumo es inusual.</li>"
-                           "<li><b>Acción:</b> Sugiere optimizaciones para mejorar el rendimiento.</li>"
-                           "</ul>")
+        layout_ini.setContentsMargins(40, 40, 40, 40)
+
+        texto_ini = QLabel(
+            "<h1 style='color: white; font-size: 32px; margin-bottom: 10px;'>Monitor de Salud Inteligente</h1>"
+            "<p style='font-size: 18px; color: #cccccc; line-height: 1.5;'>"
+            "Este sistema utiliza <b>Inteligencia Artificial</b> para supervisar tu hardware en tiempo real "
+            "basándose en los datos de <b>/proc</b>.</p>"
+            "<div style='background-color: #1a1a1a; padding: 20px; border-radius: 10px; margin-top: 20px; border: 1px solid #333;'>"
+            "<h3 style='color: white; font-size: 22px;'>¿Cómo interpretar los colores?</h3>"
+            "<ul style='font-size: 18px; line-height: 1.8; color: #cccccc;'>"
+            "<li><span style='color: #3498db;'>■</span> <b>Zona Azul:</b> El rango normal calculado por la IA basándose en tu historial.</li>"
+            "<li><span style='color: #2ecc71;'>■</span> <b>Línea Verde:</b> El consumo actual es correcto y está dentro del rango.</li>"
+            "<li><span style='color: #e74c3c;'>■</span> <b>Línea Roja:</b> <b>¡Anomalía detectada!</b> La aplicación consume más de lo habitual.</li>"
+            "</ul>"
+            "</div>"
+        )
         texto_ini.setWordWrap(True)
         layout_ini.addWidget(texto_ini)
+        layout_ini.addStretch() # Esto empuja el texto hacia arriba para que no quede centrado en medio de la nada
         self.p_inicio.setLayout(layout_ini)
-        
         # Añadir páginas
         self.paginas.addWidget(self.p_inicio)
         self.paginas.addWidget(PantallaRecurso("CPU"))
@@ -115,9 +126,33 @@ class MainWindow(QMainWindow):
         self.btn_cpu.clicked.connect(lambda: self.paginas.setCurrentIndex(1))
         self.btn_ram.clicked.connect(lambda: self.paginas.setCurrentIndex(2))
 
+# --- MODIFICACIÓN 1: BARRA LATERAL ---
+        main_layout.setSpacing(0) 
+
+        sidebar_container = QWidget()
+        sidebar_container.setLayout(self.sidebar)
+        sidebar_container.setStyleSheet("""
+            QWidget {
+                background-color: white; /* Fondo totalmente blanco */
+                border-right: 2px solid #ced4da; /* Línea divisoria gris */
+            }
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                color: black; /* Letra negra para que contraste bien */
+                text-align: left;
+                padding: 10px;
+                font-size: 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f1f3f5; /* Gris muy clarito al pasar el ratón */
+            }
+        """)
+
         # Layout final
         container = QWidget()
-        main_layout.addLayout(self.sidebar, 1)
+        main_layout.addWidget(sidebar_container, 1)
         main_layout.addWidget(self.paginas, 4)
         container.setLayout(main_layout)
         self.setCentralWidget(container)
