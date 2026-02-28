@@ -1,3 +1,4 @@
+"""
 import psutil
 import datetime
 import time
@@ -40,3 +41,27 @@ def obtain_process_data():
     processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
             
     return processes
+    """
+import psutil
+
+def obtain_process_data():
+    """Retorna los 10 procesos con mayor consumo de CPU."""
+    processes = []
+    # Iteración sobre procesos activos con atributos específicos
+    for proc in psutil.process_iter(attrs=['pid', 'name', 'cpu_percent', 'memory_percent']):
+        try:
+            # interval=None evita el bloqueo del hilo de ejecución
+            cpu = proc.info['cpu_percent'] or 0.0
+            mem = proc.info['memory_percent'] or 0.0
+            
+            processes.append({
+                "pid": proc.info['pid'],
+                "name": proc.info['name'],
+                "cpu_percent": cpu,
+                "mem_percent": round(mem, 2)
+            })
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+            
+    # Ordenación descendente por uso de CPU
+    return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
