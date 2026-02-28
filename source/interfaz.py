@@ -1,5 +1,5 @@
 import gi
-gi.require_version("Gtk", "3.0") # Usamos 3.0 por ser la más estable en Python
+gi.require_version("Gtk", "4.0") # Usamos 3.0 por ser la más estable en Python
 from gi.repository import Gtk, Pango
 
 class MonitorSistemaIA(Gtk.Window):
