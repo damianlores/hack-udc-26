@@ -22,4 +22,17 @@ def generate_response(prompt: str) -> str:
         return response.output_text
     except Exception as e:
         return f"API execution failed: {str(e)}"
-    
+
+def analizar_con_ia(cpu, ram, procesos):
+    prompt_sistema = (
+        f"Actúa como un experto en sistemas operativos. "
+        f"Estado actual: CPU al {cpu}%, RAM al {ram}%, y {procesos} procesos activos. "
+        "Dime de forma breve (máximo 2 frases) si el consumo es normal o si "
+        "hay algo sospechoso, y da un consejo práctico."
+    )
+    try:
+        # Importante: Asegúrate de que llame a tu función generate_response
+        respuesta = generate_response(prompt_sistema) 
+        return respuesta
+    except Exception:
+        return "No se pudo conectar con el analista de IA en este momento."
