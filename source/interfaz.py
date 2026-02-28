@@ -123,11 +123,13 @@ class MainWindow(QMainWindow):
         self.sidebar.addWidget(self.btn_ram)
         
         # Detectar Discos automáticamente
-        for part in psutil.disk_partitions():
-            if 'fixed' in part.opts or part.fstype:
-                btn = QPushButton(f"💾 Disco ({part.device})")
-                btn.clicked.connect(lambda ch, p=part.device: self.cambiar_pestaña_disco(p))
-                self.sidebar.addWidget(btn)
+        for part in psutil.disk_partitions(all=False):
+            if part.device.startswith('/dev/loop') or part.fstype in ('squashfs', 'tmpfs', 'devtmpfs', ''):
+                continue
+            
+            btn = QPushButton(f"Disco ({part.mountpoint})")
+            btn.clicked.connect(lambda ch, p=part.device: self.cambiar_pestaña_disco(p))
+            self.sidebar.addWidget(btn)
         
         self.sidebar.addStretch()
         
