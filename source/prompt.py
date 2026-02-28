@@ -1,28 +1,25 @@
-from google import genai
-
-# The client gets the API key from the environment variable `GEMINI_API_KEY`.
-client = genai.Client()
-
-response = client.models.generate_content(
-    model="gemini-3-flash-preview", contents="Explain how AI works in a few words"
-)
-print(response.text)
-
+from openai import OpenAI
 import os
 
-def generate_gemini_response(prompt: str, model_name: str = "gemini-1.5-pro") -> str:
+def generate_response(prompt: str) -> str:
     """
-    Passes a string prompt to the Gemini API and returns the text response.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
+    
     if not api_key:
-        raise ValueError("Environment variable GEMINI_API_KEY is not set.")
+        raise ValueError("Environment variable GROQ_API_KEY is not set.")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name)
-
+    client = OpenAI(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+    )   
+    
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        response = client.responses.create(
+            input=prompt,
+            model="llama-3.3-70b-versatile",
+        )
+        return response.output_text
     except Exception as e:
         return f"API execution failed: {str(e)}"
+    
