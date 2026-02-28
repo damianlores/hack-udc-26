@@ -1,88 +1,105 @@
 import gi
-gi.require_version("Gtk", "4.0") # Usamos 3.0 por ser la más estable en Python
-from gi.repository import Gtk, Pango
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1") # Recomendado para apps modernas en GTK4
+from gi.repository import Gtk, Adw, Gio
 
-class MonitorSistemaIA(Gtk.Window):
-    def __init__(self):
-        super().__init__(title="AI System Health Monitor")
+class MonitorGTK4(Adw.ApplicationWindow):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.set_title("AI System Health Monitor")
         self.set_default_size(1000, 600)
 
-        # 1. Contenedor principal Horizontal (Divide Menú de Contenido)
+        # 1. Contenedor principal dividido (Gtk.Paned)
         # Esto crea la línea divisoria física que pedías
-        self.main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self.add(self.main_box)
+        self.split_view = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.set_content(self.split_view)
 
-        # 2. BARRA LATERAL (Índice)
-        self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.sidebar.set_size_request(200, -1)
-        self.sidebar.get_style_context().add_class("sidebar") # Para CSS luego
-        self.main_box.pack_start(self.sidebar, False, False, 0)
+        # 2. LADO IZQUIERDO: Barra Lateral (Índice)
+        self.sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.sidebar_box.set_size_request(220, -1)
+        self.split_view.set_start_child(self.sidebar_box)
 
-        # Añadimos un separador vertical (Línea divisoria visual)
-        separador = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        self.main_box.pack_start(separador, False, False, 0)
-
-        # 3. PANEL DE PÁGINAS (Stack)
+        # 3. LADO DERECHO: El Stack de páginas
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
-        self.main_box.pack_start(self.stack, True, True, 0)
+        self.split_view.set_end_child(self.stack)
 
-        # Conectar el índice con las páginas
+        # Conector: StackSidebar (Crea el menú automáticamente)
         sidebar_menu = Gtk.StackSidebar()
         sidebar_menu.set_stack(self.stack)
-        self.sidebar.pack_start(sidebar_menu, True, True, 0)
+        self.sidebar_box.append(sidebar_menu)
 
-        # --- CREACIÓN DE PÁGINAS ---
+        # --- PÁGINAS ---
         self.crear_pagina_inicio()
         self.crear_pagina_recurso("CPU")
         self.crear_pagina_recurso("Memoria")
-
-        self.show_all()
+        
+        # Opcional: Mostrar discos dinámicamente como en el plan previo
+        # self.crear_pagina_recurso("Disco C:")
 
     def crear_pagina_inicio(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        box.set_margin_top(30)
-        box.set_margin_start(30)
+        # Página basada en tu descripción de "Inicio"
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        vbox.set_margin_top(40)
+        vbox.set_margin_start(40)
+        vbox.set_margin_end(40)
 
-        # Texto de Inicio Grande (Título)
-        titulo = Gtk.Label()
-        titulo.set_markup("<span size='xx-large' weight='bold' foreground='#1a237e'>Monitor de Salud Inteligente</span>")
-        titulo.set_xalign(0)
-        box.pack_start(titulo, False, False, 0)
+        # Título Grande con estilo GTK4
+        titulo = Gtk.Label(label="Monitor de Salud Inteligente")
+        titulo.add_css_class("title-1") # Estilo de texto muy grande
+        titulo.set_halign(Gtk.Align.START)
+        vbox.append(titulo)
 
-        # Descripción basada en el Roadmap
-        desc = Gtk.Label()
-        desc.set_markup(
-            "Este sistema recolecta métricas de <b>/proc</b> y utiliza IA para detectar anomalías.\n\n"
-            "<b>Instrucciones:</b>\n"
-            "1. Selecciona un recurso en la izquierda.\n"
-            "2. Observa la gráfica de consumo en tiempo real.\n"
-            "3. Revisa las alertas si el consumo sale del rango normal."
+        # Explicación del Roadmap
+        desc_text = (
+            "Esta herramienta analiza el sistema usando datos de <b>/proc</b>.\n\n"
+            "• <b>IA:</b> Utiliza modelos como <i>Isolation Forest</i> para aprender qué es normal.\n"
+            "• <b>Detección:</b> Si una aplicación como Firefox consume fuera de rango, verás una alerta.\n"
+            "• <b>Interfaz:</b> Navega por las pestañas laterales para ver métricas específicas."
         )
-        desc.set_line_wrap(True)
-        desc.set_xalign(0)
-        box.pack_start(desc, False, False, 0)
+        
+        desc = Gtk.Label()
+        desc.set_markup(desc_text)
+        desc.set_wrap(True)
+        desc.set_halign(Gtk.Align.START)
+        vbox.append(desc)
 
-        self.stack.add_titled(box, "inicio", "🏠 Inicio")
+        self.stack.add_titled(vbox, "inicio", "🏠 Inicio")
 
     def crear_pagina_recurso(self, nombre):
-        # Aquí iría tu diseño de: [Gráfica | Alertas]
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        # Estructura del boceto: [ Gráfica (izq) | Alertas (der) ]
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
+        hbox.set_margin_all(20)
+
+        # Columna Izquierda: Espacio para el gráfico de líneas del boceto
+        grafica_frame = Gtk.Frame()
+        grafica_frame.set_hexpand(True)
+        grafica_label = Gtk.Label(label=f"Aquí se renderizará el gráfico de {nombre}")
+        grafica_frame.set_child(grafica_label)
+        hbox.append(grafica_frame)
+
+        # Columna Derecha: Alertas de procesos
+        alertas_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        alertas_vbox.set_size_request(250, -1)
         
-        # Lado izquierdo: Espacio para Gráfica
-        area_grafica = Gtk.Frame(label=f"Gráfica de {nombre}")
-        area_grafica.set_shadow_type(Gtk.ShadowType.IN)
-        box.pack_start(area_grafica, True, True, 10)
+        lbl_alertas = Gtk.Label(label="Alertas y Procesos")
+        lbl_alertas.add_css_class("heading")
+        alertas_vbox.append(lbl_alertas)
 
-        # Lado derecho: Alertas (tus barras del dibujo)
-        alertas_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        alertas_box.pack_start(Gtk.Label(label="Alertas detectadas"), False, False, 5)
-        # Aquí añadiríamos las barras personalizadas más adelante
-        box.pack_start(alertas_box, False, False, 10)
+        # Aquí irían los widgets de barras personalizadas (ej. Firefox, WhatsApp)
+        hbox.append(alertas_vbox)
 
-        self.stack.add_titled(box, nombre.lower(), f"📊 {nombre}")
+        self.stack.add_titled(hbox, nombre.lower(), f"📊 {nombre}")
+
+class Application(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="org.hackudc.monitor",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        win = MonitorGTK4(application=self)
+        win.present()
 
 if __name__ == "__main__":
-    win = MonitorSistemaIA()
-    win.connect("destroy", Gtk.main_quit)
-    Gtk.main()
+    app = Application()
+    app.run(None)
