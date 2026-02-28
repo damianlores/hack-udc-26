@@ -3,7 +3,6 @@ import datetime
 import time
 
 def obtain_process_data():
-
     attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'memory_info', 'create_time']
     active_processes = list(psutil.process_iter(attributes))
     
@@ -38,7 +37,6 @@ def obtain_process_data():
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
             
-    # Ordenar procesos por uso de CPU (mayor a menor)
     processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
             
     return processes
