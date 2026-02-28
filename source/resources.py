@@ -63,3 +63,37 @@ def obtain_process_data():
             
     # Ordenación descendente por uso de CPU
     return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
+
+
+
+
+from collections import deque
+import datetime
+
+class HistorialRecursos:
+    def __init__(self, capacidad=5):
+        # Mantiene el historial de muestreos
+        self.muestreos = deque(maxlen=capacidad)
+        self.capacidad = capacidad
+
+    def registrar_muestreo(self, procesos_top_10):
+        """Guarda los 10 procesos actuales en el historial."""
+        registro = {
+            "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+            "procesos": procesos_top_10 
+        }
+        self.muestreos.append(registro)
+
+    def esta_listo(self):
+        """Verifica si ya tenemos los 5 samples requeridos."""
+        return len(self.muestreos) == self.capacidad
+
+    def formatear_para_ia(self):
+        """Genera el texto estructurado para el prompt."""
+        texto = f"ANÁLISIS DE TENDENCIA (Basado en {self.capacidad} muestreos):\n"
+        for i, m in enumerate(self.muestreos):
+            texto += f"\nSample {i+1} [{m['timestamp']}]:\n"
+            # Incluye los 10 procesos recopilados por save_process_data
+            for p in m['procesos']:
+                texto += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_mb']}MB\n"
+        return texto
