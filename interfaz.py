@@ -1,3 +1,4 @@
+from collections import deque
 import sys
 import psutil
 import datetime
@@ -5,19 +6,21 @@ import os
 import heapq
 from dotenv import load_dotenv
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                             QVBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame, QScrollArea, QTextEdit)
+                             QVBoxLayout, QLabel, QPushButton, QStackedWidget, 
+                             QFrame, QScrollArea, QTextEdit, QDialog)
 from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QPolygonF
 
 from plyer import notification  # <--- Para las notificaciones de Windows/Linux
 
 # --- HILO GLOBAL DE PROCESOS ---
-class WorkerProcesos(QThread):
-    processes_data = pyqtSignal(list, str) # Lista de procesos + mensaje IA
+class WorkerProcesses(QThread):
+    processes_data = pyqtSignal(list, str, str) # Lista de procesos + mensaje IA
     
     def __init__(self, api_key):
         super().__init__()
         self.api_key = api_key
+        self.historic_ai = deque(maxlen=10)
 
     def run(self):
         from resources import obtain_process_data, save_process_data, ResourceHistoric
@@ -26,14 +29,13 @@ class WorkerProcesos(QThread):
         historic = ResourceHistoric(capacity=5)
         context = "Sin contexto previo."
         message = "Recopilando datos para análisis de comportamiento..."
+        historic_text = ""  # Variable para almacenar el historial de alertas de IA
 
         while True:
             try:
                 # 1. Obtener datos ligeros para las barras de la interfaz
                 processes_ui = obtain_process_data()
-                
                 # 2. Obtener datos detallados para el análisis de la IA
-                # Nota: save_process_data realiza un muestreo interno
                 processes_ai = save_process_data()
                 historic.save_sample(processes_ai[:10])
                 
@@ -44,6 +46,13 @@ class WorkerProcesos(QThread):
                     response = analyze_samples(context, samples, self.api_key)
                     context = response
                     message = response
+                    
+                    # Generar timestamp y guardar en el deque
+                    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                    self.historic_ai.append(f"[{timestamp}] {response}")
+                    
+                    # Unir el historial completo para el popup
+                    historic_text = "\n\n---\n\n".join(reversed(self.historic_ai))
 
                     # Lógica de notificación de sistema ante alertas
                     if "ALERTA:" in message.upper():
@@ -58,13 +67,13 @@ class WorkerProcesos(QThread):
                             pass
 
                 # 4. Emitir datos a la interfaz gráfica
-                self.processes_data.emit(processes_ui, message)
+                self.processes_data.emit(processes_ui, message, historic_text)
                 
             except Exception as e:
                 print(f"Error en WorkerProcesos: {e}")
             
             # Pausa ajustada para compensar el tiempo de muestreo de save_process_data
-            self.msleep(2500)
+            self.msleep(5000)
 
 # --- HILO PARA ESCANEAR ARCHIVOS PESADOS ---
 class WorkerEscaneo(QThread):
@@ -179,7 +188,7 @@ class BarraProcesoPro(QWidget):
         painter.drawRect(x_ini, y_ini, x_valor - x_ini, alto_barra)
 
 # --- PANTALLA DE RECURSOS ---
-class PantallaRecurso(QWidget):
+class ScreenResource(QWidget):
     def __init__(self, titulo, es_disco=False, ruta=""):
         super().__init__()
         self.titulo = titulo
@@ -346,26 +355,68 @@ class PantallaRecurso(QWidget):
             self.lay_arc.addWidget(l)
         self.lay_arc.addStretch()
 
+
+class WindowHistoric(QDialog):
+    def __init__(self, texto_historial, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Historial de Análisis")
+        self.resize(600, 450)
+        self.setStyleSheet("background-color: #0b0b0b; color: white;")
+        
+        layout = QVBoxLayout(self)
+        
+        self.texto = QTextEdit()
+        self.texto.setReadOnly(True)
+        self.texto.setPlainText(texto_historial)
+        self.texto.setStyleSheet("""
+            QTextEdit {
+                background-color: #1a1a1a;
+                border: 1px solid #9b59b6;
+                border-radius: 5px;
+                color: #ccc;
+                font-family: 'Courier New';
+                font-size: 13px;
+            }
+        """)
+        
+        # Auto-scroll al final
+        cursor = self.texto.textCursor()
+        cursor.movePosition(cursor.MoveOperation.Start)
+        self.texto.setTextCursor(cursor)
+        
+        layout.addWidget(self.texto)
+        
+        btn_cerrar = QPushButton("Cerrar")
+        btn_cerrar.clicked.connect(self.close)
+        btn_cerrar.setStyleSheet("background-color: #333; padding: 8px; color: white; border-radius: 5px;")
+        layout.addWidget(btn_cerrar)
+        
+        
+
 # --- VENTANA PRINCIPAL ---
 class MainWindow(QMainWindow):
     def __init__(self, api_key):
         super().__init__()
         self.api_key = api_key
-        self.worker_global = WorkerProcesos(self.api_key)
+        self.alert_historic = ""
+        self.worker_global = WorkerProcesses(self.api_key)
+        self.worker_global.processes_data.connect(self.update_alert_historic)
         
         self.setWindowTitle("Hack-UDC AI Monitor")
         self.resize(1100, 650)
 
-        main_layout = QHBoxLayout()
-        main_layout.setSpacing(0)
+        layout_main = QHBoxLayout()
+        layout_main.setSpacing(0)
 
-        self.sidebar_lay = QVBoxLayout()
-        self.btn_inicio = QPushButton("Inicio")
-        self.btn_cpu = QPushButton("CPU")
-        self.btn_ram = QPushButton("Memoria")
-        self.sidebar_lay.addWidget(self.btn_inicio)
-        self.sidebar_lay.addWidget(self.btn_cpu)
-        self.sidebar_lay.addWidget(self.btn_ram)
+        self.layout_sidebar = QVBoxLayout()
+        self.button_inicio = QPushButton("Inicio")
+        self.button_cpu = QPushButton("CPU")
+        self.button_ram = QPushButton("Memoria")
+        
+        self.layout_sidebar.addWidget(self.button_inicio)
+        self.layout_sidebar.addWidget(self.button_cpu)
+        self.layout_sidebar.addWidget(self.button_ram)
+        
 
         for part in psutil.disk_partitions(all=False):
             if part.fstype in ('squashfs', 'tmpfs', ''): 
@@ -373,13 +424,34 @@ class MainWindow(QMainWindow):
             # MacOS system volumes ignore
             if "/System/Volumes" in part.mountpoint and not part.mountpoint.endswith("/Data"):
                 continue
-            btn = QPushButton(f"Disco ({part.mountpoint})")
-            btn.clicked.connect(lambda ch, p=part.mountpoint: self.cambiar_pestaña_disco(p))
-            self.sidebar_lay.addWidget(btn)
-        self.sidebar_lay.addStretch()
+            button = QPushButton(f"Disco ({part.mountpoint})")
+            button.clicked.connect(lambda ch, p=part.mountpoint: self.disk_window(p))
+            self.layout_sidebar.addWidget(button)
+            
+        # 1. EL ESPACIADOR VA PRIMERO: Empuja las particiones hacia arriba
+        self.layout_sidebar.addStretch()
+        
+        self.button_historic = QPushButton("Historial de Alertas")
+        self.button_historic.setMinimumHeight(40)
+        self.button_historic.setStyleSheet("""
+            QPushButton {
+                color: #9b59b6; 
+                border: 2px solid #9b59b6;
+                border-radius: 8px;
+                background-color: #ffffff;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            QPushButton:hover {
+                background-color: #9b59b6;
+                color: white;
+            }
+        """)
+        self.button_historic.clicked.connect(self.historic_popup)
+        self.layout_sidebar.addWidget(self.button_historic)
 
         sidebar_container = QWidget()
-        sidebar_container.setLayout(self.sidebar_lay)
+        sidebar_container.setLayout(self.layout_sidebar)
         sidebar_container.setFixedWidth(200)
         sidebar_container.setStyleSheet("""
             QWidget { background-color: white; border-right: 1px solid #ced4da; } 
@@ -387,31 +459,31 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #f1f3f5; }
         """)
 
-        self.paginas = QStackedWidget()
-        self.p_inicio = self.crear_inicio()
-        self.p_cpu = PantallaRecurso("CPU")
-        self.p_ram = PantallaRecurso("Memoria")
+        self.pages = QStackedWidget()
+        self.p_inicio = self.create_inicio()
+        self.p_cpu = ScreenResource("CPU")
+        self.p_ram = ScreenResource("Memoria")
 
         self.worker_global.processes_data.connect(self.p_cpu.refresh_process_list)
         self.worker_global.processes_data.connect(self.p_ram.refresh_process_list)
 
-        self.paginas.addWidget(self.p_inicio)
-        self.paginas.addWidget(self.p_cpu)
-        self.paginas.addWidget(self.p_ram)
+        self.pages.addWidget(self.p_inicio)
+        self.pages.addWidget(self.p_cpu)
+        self.pages.addWidget(self.p_ram)
 
-        self.btn_inicio.clicked.connect(lambda: self.paginas.setCurrentIndex(0))
-        self.btn_cpu.clicked.connect(lambda: self.paginas.setCurrentIndex(1))
-        self.btn_ram.clicked.connect(lambda: self.paginas.setCurrentIndex(2))
+        self.button_inicio.clicked.connect(lambda: self.pages.setCurrentIndex(0))
+        self.button_cpu.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        self.button_ram.clicked.connect(lambda: self.pages.setCurrentIndex(2))
 
-        main_layout.addWidget(sidebar_container)
-        main_layout.addWidget(self.paginas)
+        layout_main.addWidget(sidebar_container)
+        layout_main.addWidget(self.pages)
         
         container = QWidget()
-        container.setLayout(main_layout)
+        container.setLayout(layout_main)
         self.setCentralWidget(container)
         self.worker_global.start()
 
-    def crear_inicio(self):
+    def create_inicio(self):
         w = QWidget()
         w.setStyleSheet("background-color: black;")
         layout_ini = QVBoxLayout(w)
@@ -439,10 +511,27 @@ class MainWindow(QMainWindow):
         
         return w
 
-    def cambiar_pestaña_disco(self, ruta):
-        nueva = PantallaRecurso(f"Disco {ruta}", es_disco=True, ruta=ruta)
-        self.paginas.addWidget(nueva)
-        self.paginas.setCurrentWidget(nueva)
+    def disk_window(self, ruta):
+        nueva = ScreenResource(f"Disco {ruta}", es_disco=True, ruta=ruta)
+        self.pages.addWidget(nueva)
+        self.pages.setCurrentWidget(nueva)
+        
+    def update_alert_historic(self, lista, message, alert_historic):
+        """Guarda el mensaje recibido en la variable local para el pop-up."""
+        self.alert_historic = alert_historic
+        # También actualiza las pantallas activas (CPU/RAM) como antes
+        self.p_cpu.refresh_process_list(lista, message)
+        self.p_ram.refresh_process_list(lista, message)
+
+    def historic_popup(self):
+        """Crea y muestra la ventana emergente con el contenido actual."""
+        if not self.alert_historic:
+            contenido = "No hay registros en el historial todavía."
+        else:
+            contenido = self.alert_historic
+            
+        popup = WindowHistoric(contenido, self)
+        popup.exec() # .exec() hace que sea modal (bloquea la principal hasta cerrar)
 
 def init_ui():
      app = QApplication(sys.argv)
