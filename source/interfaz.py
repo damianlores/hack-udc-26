@@ -26,6 +26,47 @@ class WorkerProcesos(QThread):
                 print(f"Error en escaneo de procesos: {e}")
             self.msleep(3000)
 
+"""def run(self):
+        while True:
+            try:
+                # 1. Obtener datos detallados
+                procesos = save_process_data()
+                top_10 = procesos[:10]
+                
+                # 2. Guardar en el bloque actual
+                self.historial.registrar(top_10)
+                
+                # Mensaje por defecto mientras se llena el bloque
+                mensaje_ia = f"Analizando comportamiento... ({len(self.historial.muestreos)}/5)"
+
+                # 3. Cuando el bloque de 5 está lleno
+                if self.historial.esta_lleno():
+                    texto_bloque = self.historial.obtener_texto_samples()
+                    respuesta = analyze_samples(self.ultimo_contexto, texto_bloque)
+                    
+                    self.ultimo_contexto = respuesta # Guardamos para el siguiente prompt
+                    mensaje_ia = respuesta
+
+                    # 4. LÓGICA DE NOTIFICACIÓN
+                    if "ALERTA:" in respuesta.upper():
+                        notification.notify(
+                            title='⚠️ Actividad Sospechosa Detectada',
+                            message=respuesta.replace("ALERTA:", "").strip(),
+                            app_name='Salud Inteligente',
+                            timeout=10
+                        )
+                    
+                    # 5. BORRAR: Limpiamos los 5 samples para empezar de nuevo
+                    self.historial.limpiar()
+
+                # Enviamos los datos a la interfaz gráfica
+                self.datos_actualizados.emit(top_10, mensaje_ia)
+                
+            except Exception as e:
+                print(f"Error en WorkerProcesos: {e}")
+            
+            self.msleep(3000) # Pausa de 3 segundos entre capturas"""
+
 # --- HILO PARA ESCANEAR ARCHIVOS PESADOS ---
 class WorkerEscaneo(QThread):
     finalizado = pyqtSignal(list)
