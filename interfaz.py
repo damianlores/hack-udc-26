@@ -1,3 +1,6 @@
+import database  # Esto busca el archivo database.py (antes historial.py)
+import ia_engine # Esto busca tu lógica de IA
+
 import sys
 import psutil
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
