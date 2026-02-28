@@ -16,7 +16,7 @@ def generate_response(prompt: str, api_key: str) -> str:
     )
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
