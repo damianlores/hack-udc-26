@@ -16,18 +16,6 @@ ARQUITECTURA DE SOFTWARE
 La aplicación sigue un diseño modular dividido en cuatro componentes críticos: la gestión de Interfaz (GUI) desarrollada con PyQt6, con multithreading que utiliza hilos secundarios (QThread) para la recolección de datos y el análisis de IA, evitando el bloqueo de la interfaz de usuario (UI) durante operaciones pesadas, también contene visualización dinámica incluye gráficas animadas que se actualizan cada 500ms para mostrar la fluctuación de carga de CPU y Memoria; Recolección de Métricas (resources.py) utilizando la librería psutil para la recopilación de métricas del sistema operativo; Análisis de Procesos filtrando y ordenando los 10 procesos con mayor consumo de recursos; por ultimo un historial de alertas, el cual recoge las últimas 10 alertas.
 
 
-LÓGICA DE FLUJO DE DATOS
-
-    Inicio: El MainWindow lanza los hilos de monitoreo.
-
-    Captura: obtain_process_data extrae los procesos actuales.
-
-    Histórico: Los datos se acumulan en ResourceHistoric hasta completar 5 muestras.
-
-    Inferencia: Se envía el historial a la API de Groq con un prompt de experto en sistemas.
-
-    Feedback: La respuesta de la IA se muestra en la interfaz y, si es necesario, se emite una alerta sonora o visual.
-
-6. Conclusión
+CONCLUSIÓN
 
 Este trabajo representa una solución integral que combina la potencia del monitoreo de bajo nivel en Python con las capacidades interpretativas de los modelos de lenguaje de gran escala (LLMs). La arquitectura garantiza fluidez mediante el uso de hilos concurrentes y proporciona una experiencia de usuario simplificada para una tarea tradicionalmente técnica.
