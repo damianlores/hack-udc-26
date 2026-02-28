@@ -15,11 +15,11 @@ def generate_response(prompt: str) -> str:
     )   
     
     try:
-        response = client.responses.create(
-            input=prompt,
+        response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}]
         )
-        return response.output_text
+        return response.choices[0].message.content
     except Exception as e:
         return f"API execution failed: {str(e)}"
 
