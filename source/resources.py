@@ -67,36 +67,37 @@ def obtain_process_data():
     return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
 
 
-class HistorialRecursos:
+class ResourceHistoric:
     def __init__(self, capacidad=5):
         # Mantiene el historial de muestreos
-        self.muestreos = deque(maxlen=capacidad)
-        self.capacidad = capacidad
+        self.samples = deque(maxlen=capacidad)
+        self.capacity = capacidad
 
-    def registrar_muestreo(self, procesos_top_10):
+    def save_sample(self, processes):
         """Guarda los 10 procesos actuales en el historial."""
-        registro = {
+        sample = {
             "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
-            "procesos": procesos_top_10 
+            "procesos": processes 
         }
-        self.muestreos.append(registro)
+        self.samples.append(sample)
 
-    def esta_listo(self):
+    def is_ready(self):
         """Verifica si ya tenemos los 5 samples requeridos."""
-        return len(self.muestreos) == self.capacidad
+        return len(self.samples) == self.capacity
 
     def formatear_para_ia(self):
         """Genera el texto estructurado para el prompt."""
-        texto = f"ANÁLISIS DE TENDENCIA (Basado en {self.capacidad} muestreos):\n"
-        for i, m in enumerate(self.muestreos):
+        texto = f""
+        for i, m in enumerate(self.samples):
             texto += f"\nSample {i+1} [{m['timestamp']}]:\n"
             # Incluye los 10 procesos recopilados por save_process_data
             for p in m['procesos']:
-                texto += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_mb']}MB\n"
+                texto += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_percent']}MB\n"
+            self.samples = []
         return texto
 
 
-
+    """
 # interfaz.py
 class WorkerProcesos(QThread):
     datos_actualizados = pyqtSignal(list, str)
@@ -135,3 +136,4 @@ class WorkerProcesos(QThread):
             
             # Pausa de 3 segundos entre capturas
             self.msleep(3000)
+    """
