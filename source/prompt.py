@@ -36,3 +36,21 @@ def analyze_samples(context: str, samples: str) -> str:
         return response
     except Exception:
         return "No se pudo conectar con el analista de IA en este momento."
+
+
+"""def analyze_samples(context: str, samples: str) -> str:
+    prompt = (
+        f"Actúa como un experto en sistemas operativos para un usuario principiante.\n"
+        f"Contexto previo: {context}\n"
+        f"Analiza estos 5 samples de procesos:\n{samples}\n\n"
+        "REGLAS DE ORO:\n"
+        "1. Si el comportamiento es SOSPECHOSO o ANÓMALO (ej. procesos que suben sin parar), "
+        "empieza tu respuesta obligatoriamente con la palabra 'ALERTA:'.\n"
+        "2. Si es normal, no uses esa palabra.\n"
+        "3. Sé breve (máximo 3 líneas) y no uses tecnicismos."
+    )
+    try:
+        # Llama a tu función generate_response original
+        return generate_response(prompt)
+    except Exception:
+        return "No se pudo conectar con el analista de IA.""""
