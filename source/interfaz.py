@@ -69,7 +69,7 @@ class MonitorGTK4(Adw.ApplicationWindow):
     def crear_pagina_recurso(self, nombre):
         # Estructura del boceto: [ Gráfica (izq) | Alertas (der) ]
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
-        hbox.set_margin_all(20)
+        hbox.set_margin_end(20)
 
         # Columna Izquierda: Espacio para el gráfico de líneas del boceto
         grafica_frame = Gtk.Frame()
