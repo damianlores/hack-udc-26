@@ -9,7 +9,6 @@ if __name__ == "__main__":
     interval = 5  # seconds between samples
     
     from resources import save_process_data
-    from prompt import generate_response
         
     while True:
         # get top 10 most consuming processses data

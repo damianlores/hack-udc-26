@@ -9,68 +9,59 @@ from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QPolygonF
 
 from plyer import notification  # <--- Para las notificaciones de Windows/Linux
-from resources import save_process_data, HistorialBloque # <--- Tus nuevas funciones
+from resources import save_process_data, ResourceHistoric # <--- Tus nuevas funciones
 from prompt import analyze_samples # <--- Tu nueva función de IA
 
 # --- HILO GLOBAL DE PROCESOS ---
 class WorkerProcesos(QThread):
-    datos_actualizados = pyqtSignal(list)
-  # datos_actualizados = pyqtSignal(list, str) # <--- Ahora acepta dos cosas (lista y texto)
+    datos_actualizados = pyqtSignal(list, str) # Lista de procesos + mensaje IA
 
     def run(self):
-        try:
-            from resources import obtain_process_data
-        except ImportError:
-            def obtain_process_data(): return []
+        from resources import obtain_process_data, save_process_data, ResourceHistoric
+        from prompt import analyze_samples
+        
+        historic = ResourceHistoric(capacity=5)
+        context = "Sin contexto previo."
+        message = "Recopilando datos para análisis de comportamiento..."
 
         while True:
             try:
-                procesos = obtain_process_data()
-                self.datos_actualizados.emit(procesos[:10])
-            except Exception as e:
-                print(f"Error en escaneo de procesos: {e}")
-            self.msleep(3000)
-
-"""def run(self):
-        while True:
-            try:
-                # 1. Obtener datos detallados
-                procesos = save_process_data()
-                top_10 = procesos[:10]
+                # 1. Obtener datos ligeros para las barras de la interfaz
+                processes_ui = obtain_process_data()
                 
-                # 2. Guardar en el bloque actual
-                self.historial.registrar(top_10)
+                # 2. Obtener datos detallados para el análisis de la IA
+                # Nota: save_process_data realiza un muestreo interno
+                processes_ai = save_process_data()
+                historic.save_sample(processes_ai[:10])
                 
-                # Mensaje por defecto mientras se llena el bloque
-                mensaje_ia = f"Analizando comportamiento... ({len(self.historial.muestreos)}/5)"
+                # 3. Procesar bloque de IA si el historial está lleno (5 muestras)
+                if historic.is_ready():
+                    muestras_texto = historic.build_samples()
+                    # La función build_samples debe limpiar el historial tras generar el texto
+                    response = analyze_samples(context, muestras_texto)
+                    context = response
+                    message = response
 
-                # 3. Cuando el bloque de 5 está lleno
-                if self.historial.esta_lleno():
-                    texto_bloque = self.historial.obtener_texto_samples()
-                    respuesta = analyze_samples(self.ultimo_contexto, texto_bloque)
-                    
-                    self.ultimo_contexto = respuesta # Guardamos para el siguiente prompt
-                    mensaje_ia = respuesta
+                    # Lógica de notificación de sistema ante alertas
+                    if "ALERTA:" in message.upper():
+                        from plyer import notification
+                        try:
+                            notification.notify(
+                                title='Monitor de Sistema',
+                                message=message[:100],
+                                timeout=5
+                            )
+                        except:
+                            pass
 
-                    # 4. LÓGICA DE NOTIFICACIÓN
-                    if "ALERTA:" in respuesta.upper():
-                        notification.notify(
-                            title='⚠️ Actividad Sospechosa Detectada',
-                            message=respuesta.replace("ALERTA:", "").strip(),
-                            app_name='Salud Inteligente',
-                            timeout=10
-                        )
-                    
-                    # 5. BORRAR: Limpiamos los 5 samples para empezar de nuevo
-                    self.historial.limpiar()
-
-                # Enviamos los datos a la interfaz gráfica
-                self.datos_actualizados.emit(top_10, mensaje_ia)
+                # 4. Emitir datos a la interfaz gráfica
+                self.datos_actualizados.emit(processes_ui, message)
                 
             except Exception as e:
                 print(f"Error en WorkerProcesos: {e}")
             
-            self.msleep(3000) # Pausa de 3 segundos entre capturas"""
+            # Pausa ajustada para compensar el tiempo de muestreo de save_process_data
+            self.msleep(2500)
 
 # --- HILO PARA ESCANEAR ARCHIVOS PESADOS ---
 class WorkerEscaneo(QThread):
@@ -124,8 +115,9 @@ class BarraDiscoReal(QWidget):
 
 # --- GRÁFICA ANIMADA ---
 class GraficaAnimada(QWidget):
-    def __init__(self):
+    def __init__(self, tipo="CPU"):
         super().__init__()
+        self.tipo = tipo
         self.puntos = [0.0 for _ in range(50)]
         self.r_min, self.r_max = 30, 70
         self.timer = QTimer()
@@ -133,8 +125,13 @@ class GraficaAnimada(QWidget):
         self.timer.start(500)
 
     def actualizar(self):
-        uso_cpu = psutil.cpu_percent(interval=None)
-        self.puntos.append(uso_cpu)
+        # Las gráficas consultan directamente psutil para evitar latencia
+        if self.tipo == "CPU":
+            valor = psutil.cpu_percent(interval=None)
+        else:
+            valor = psutil.virtual_memory().percent
+            
+        self.puntos.append(valor)
         if len(self.puntos) > 50: self.puntos.pop(0)
         self.update()
 
@@ -144,19 +141,16 @@ class GraficaAnimada(QWidget):
         painter.fillRect(self.rect(), QColor("#1a1a1a"))
         ancho, alto = self.width(), self.height()
         paso_x = ancho / 49
-        y_max = alto - (self.r_max / 100 * alto)
-        y_min = alto - (self.r_min / 100 * alto)
+        y_max, y_min = alto - (self.r_max/100*alto), alto - (self.r_min/100*alto)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, int(y_max), ancho, int(y_min - y_max))
         poly = QPolygonF()
         for i, v in enumerate(self.puntos):
-            y_pos = alto - (v / 100 * alto)
-            poly.append(QPointF(i * paso_x, y_pos))
-        ultimo_valor = self.puntos[-1]
-        color = QColor("#2ecc71") if ultimo_valor <= self.r_max else QColor("#e74c3c")
+            poly.append(QPointF(i * paso_x, alto - (v / 100 * alto)))
+        color = QColor("#2ecc71") if self.puntos[-1] <= self.r_max else QColor("#e74c3c")
         painter.setPen(QPen(color, 3))
         painter.drawPolyline(poly)
-
+        
 # --- BARRA DE PROCESO INDIVIDUAL ---
 class BarraProcesoPro(QWidget):
     def __init__(self, nombre, valor_actual, r_min, r_max):
@@ -188,7 +182,6 @@ class PantallaRecurso(QWidget):
         self.titulo = titulo
         self.setStyleSheet("background-color: #0b0b0b;")
         layout_principal = QVBoxLayout(self)
-        layout_principal.setContentsMargins(15, 10, 15, 10) 
         
         content_h = QHBoxLayout()
         col_izq = QVBoxLayout()
@@ -220,7 +213,7 @@ class PantallaRecurso(QWidget):
             self.worker_disk = WorkerEscaneo(ruta)
             self.worker_disk.finalizado.connect(self.actualizar_archivos)
             self.worker_disk.start()
-        else:
+        else:            
             # --- TÍTULO ARRIBA ---
             lbl_tit = QLabel(f"Monitor: {titulo}")
             lbl_tit.setStyleSheet("color: white; font-size: 20px; font-weight: bold; margin-bottom: 5px;")
@@ -234,37 +227,32 @@ class PantallaRecurso(QWidget):
             lay_kpi = QHBoxLayout(panel_kpi)
             lay_kpi.setContentsMargins(15, 5, 15, 5) 
 
-            uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
-            uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
-
-            if titulo == "CPU":
-                val_principal = f"{psutil.cpu_percent()}%"
-                val_hardware = f"{psutil.cpu_count(logical=False)} núcleos / {psutil.cpu_count()} hilos"
-                lbl_desc = "Carga Total"
-            else:
-                mem = psutil.virtual_memory()
-                val_principal = f"{mem.percent}%"
-                val_hardware = f"{mem.used/(1024**3):.1f} / {mem.total/(1024**3):.1f} GB"
-                lbl_desc = "Uso de RAM"
-
-            for t_tit, t_val, t_col in [
-                (lbl_desc, val_principal, "white"),
-                ("Hardware", val_hardware, "#3498db"),
-                ("Tiempo de Uso", uptime_str, "#f1c40f")
+            # Creamos las etiquetas vacías primero para guardarlas como atributos
+            self.lbl_val_principal = QLabel("--")
+            self.lbl_val_hardware = QLabel("--")
+            self.lbl_val_uptime = QLabel("--")
+            
+            # Etiquetas de descripción
+            lbl_desc_text = "Carga Total" if titulo == "CPU" else "Uso de RAM"
+            
+            # Estructura del panel KPI
+            for t_tit, t_widget, t_col in [
+                (lbl_desc_text, self.lbl_val_principal, "white"),
+                ("Hardware", self.lbl_val_hardware, "#3498db"),
+                ("Tiempo de Uso", self.lbl_val_uptime, "#f1c40f")
             ]:
                 v_lay = QVBoxLayout()
                 v_lay.setSpacing(0)
                 v_lay.addWidget(QLabel(t_tit, styleSheet="color: #bbb; font-size: 11px;"))
-                v_lay.addWidget(QLabel(t_val, styleSheet=f"color: {t_col}; font-size: 16px; font-weight: bold;"))
+                t_widget.setStyleSheet(f"color: {t_col}; font-size: 16px; font-weight: bold;")
+                v_lay.addWidget(t_widget)
                 lay_kpi.addLayout(v_lay)
+                
             col_izq.addWidget(panel_kpi)
 
-            # --- GRÁFICA ---
-            self.grafica = GraficaAnimada()
+            self.grafica = GraficaAnimada(tipo=titulo)
             self.grafica.setFixedHeight(180)
             col_izq.addWidget(self.grafica)
-            
-            # ESTIRAMIENTO FINAL: Esto empuja todo lo anterior hacia arriba
             col_izq.addStretch()
 
             # --- COLUMNA DERECHA (PROCESOS) ---
@@ -283,28 +271,53 @@ class PantallaRecurso(QWidget):
         content_h.addLayout(col_der, stretch=1)
         layout_principal.addLayout(content_h)
 
-        # Recuadro morado para la IA al fondo
-        self.panel_ia = QFrame()
-        self.panel_ia.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
-        self.panel_ia.setFixedHeight(80)
-       """ lay_ia = QVBoxLayout(self.panel_ia)
+        # Panel inferior para la IA
+        self.panel_ai = QFrame()
+        self.panel_ai.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
+        self.panel_ai.setFixedHeight(120)
+        lay_ia = QVBoxLayout(self.panel_ai)
         self.lbl_ia = QLabel("Esperando análisis de comportamiento...")
         self.lbl_ia.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
         self.lbl_ia.setWordWrap(True)
-        lay_ia.addWidget(self.lbl_ia)"""
-        layout_principal.addWidget(self.panel_ia)
+        lay_ia.addWidget(self.lbl_ia)
+        layout_principal.addWidget(self.panel_ai)
 
-    def refrescar_lista_procesos(self, lista):
+    def refrescar_lista_procesos(self, lista, message):
         if not hasattr(self, 'lay_procesos'): return
+        
+        # --- 1. ACTUALIZAR PANEL KPI ---
+        uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
+        uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
+        self.lbl_val_uptime.setText(uptime_str)
+
+        if self.titulo == "CPU":
+            # Usamos interval=None para no bloquear la interfaz
+            val_principal = f"{psutil.cpu_percent(interval=None)}%"
+            val_hardware = f"{psutil.cpu_count(logical=False)} núcleos / {psutil.cpu_count()} hilos"
+        else:
+            mem = psutil.virtual_memory()
+            val_principal = f"{mem.percent}%"
+            val_hardware = f"{mem.used/(1024**3):.1f} / {mem.total/(1024**3):.1f} GB"
+        
+        self.lbl_val_principal.setText(val_principal)
+        self.lbl_val_hardware.setText(val_hardware)
+
+        # --- 2. ACTUALIZAR LISTADO DE PROCESOS ---
         while self.lay_procesos.count():
             item = self.lay_procesos.takeAt(0)
             if item.widget(): item.widget().deleteLater()
         for p in lista:
+            # Importante: Asegúrate de usar la clase correcta para las barras
             self.lay_procesos.addWidget(BarraProcesoPro(p['name'][:15], p['cpu_percent'], 0, 20))
         self.lay_procesos.addStretch()
-      """# Actualizar el texto de la IA
+        
+        # --- 3. ACTUALIZAR TEXTO DE LA IA ---
         if hasattr(self, 'lbl_ia'):
-            self.lbl_ia.setText(mensaje_ia)"""
+            self.lbl_ia.setText(message)
+            if "ALERTA:" in message.upper():
+                self.lbl_ia.setStyleSheet("color: #ff4c4c; font-size: 14px; font-weight: bold;")
+            else:
+                self.lbl_ia.setStyleSheet("color: #9b59b6; font-size: 14px; font-style: italic;")
 
     def actualizar_archivos(self, lista):
         if hasattr(self, 'lbl_load'): self.lbl_load.deleteLater()

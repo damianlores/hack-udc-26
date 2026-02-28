@@ -39,10 +39,8 @@ def save_process_data():
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
             
-    processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
-            
-    return processes
-
+    return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
+    
 
 def obtain_process_data():
     """Retorna los 10 procesos con mayor consumo de CPU."""

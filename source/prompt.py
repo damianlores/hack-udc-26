@@ -1,5 +1,5 @@
 from openai import OpenAI
-import os
+import time
 
 def generate_response(prompt: str) -> str:
     """
@@ -39,3 +39,27 @@ def analyze_samples(context: str, samples: str) -> str:
         return response
     except Exception:
         return "No se pudo conectar con el analista de IA en este momento."
+
+def get_advice():
+    from resources import ResourceHistoric
+    historic = ResourceHistoric(capacity=5)
+    context = f"No hay contexto todavia"
+    interval = 5  # seconds between samples
+    
+    from resources import save_process_data
+        
+    while True:
+        # get top 10 most consuming processses data
+        processes = save_process_data()[:10]
+        
+        # save info in the historic
+        historic.save_sample(processes)
+        
+        if historic.is_ready():
+            samples = f"Samples con intervalos de {interval}s, ordenados por uso de CPU:" + historic.build_samples()
+            
+            context = analyze_samples(context, samples)
+            
+            return context
+            
+        time.sleep(interval)
