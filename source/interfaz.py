@@ -117,19 +117,13 @@ class BarraProcesoPro(QWidget):
         painter.setPen(QPen(color_linea, 4))
         painter.drawLine(x_valor, y_ini - 4, x_valor, y_ini + alto_barra + 4)
 
-# --- PANTALLA DE RECURSOS ADAPTATIVA (CON IA ADVISOR RESTAURADO) ---
+# --- PANTALLA DE RECURSOS ADAPTATIVA (SIN HEALTH SCORE) ---
 class PantallaRecurso(QWidget):
     def __init__(self, titulo, es_disco=False, ruta=""):
         super().__init__()
         self.setStyleSheet("background-color: #0b0b0b;")
         layout_principal = QVBoxLayout(self)
         
-        # Health Score
-        val_score = random.randint(88, 97) if not es_disco else (100 - psutil.disk_usage(ruta).percent)
-        self.lbl_score = QLabel(f"Health Score: {int(val_score)}%")
-        self.lbl_score.setStyleSheet(f"font-size: 28px; font-weight: bold; color: {'#2ecc71' if val_score > 60 else '#e74c3c'}; padding: 10px;")
-        layout_principal.addWidget(self.lbl_score)
-
         content_h = QHBoxLayout()
         col_izq = QVBoxLayout()
         
@@ -158,8 +152,9 @@ class PantallaRecurso(QWidget):
             lay_t = QVBoxLayout(tips)
             lay_t.addWidget(QLabel("💡 IA Advisor", styleSheet="color: #9b59b6; font-size: 18px; font-weight: bold;"))
             
-            # Lógica de mensaje según el score
-            msg = "Disco saludable. El espacio libre permite una gestión de caché óptima." if val_score > 30 else "⚠️ ¡Poco espacio! El sistema podría ralentizarse. Borra archivos grandes."
+            # Ajuste de mensaje sin depender del score aleatorio
+            porcentaje_uso = psutil.disk_usage(ruta).percent
+            msg = "Disco saludable. El espacio libre permite una gestión de caché óptima." if porcentaje_uso < 70 else "⚠️ ¡Poco espacio! El sistema podría ralentizarse. Borra archivos grandes."
             
             lbl_msg = QLabel(msg)
             lbl_msg.setStyleSheet("color: white; font-size: 14px;")
@@ -169,10 +164,10 @@ class PantallaRecurso(QWidget):
             
             # Añadimos la columna izquierda y el panel de tips al layout horizontal
             content_h.addLayout(col_izq, stretch=2)
-            content_h.addWidget(tips) # <-- Aquí es donde se mete el panel que faltaba
+            content_h.addWidget(tips)
             
         else:
-            # Modo CPU/RAM (se mantiene igual)
+            # Modo CPU/RAM
             col_izq.addWidget(QLabel(f"Análisis en tiempo real: {titulo}", styleSheet="color: white; font-size: 18px;"))
             self.grafica = GraficaAnimada()
             self.grafica.setMinimumHeight(300)
@@ -189,7 +184,6 @@ class PantallaRecurso(QWidget):
         layout_principal.addLayout(content_h)
 
     def actualizar_archivos(self, lista):
-        # (El método actualizar_archivos se mantiene igual que en la versión anterior)
         if hasattr(self, 'lbl_load'):
             self.lbl_load.deleteLater()
         self.lay_arc.addWidget(QLabel("📂 Archivos más grandes:", styleSheet="color: #9b59b6; font-weight: bold;"))
@@ -198,6 +192,7 @@ class PantallaRecurso(QWidget):
             l.setStyleSheet("color: white; font-size: 13px; background: #252525; padding: 4px; border-radius: 4px;")
             self.lay_arc.addWidget(l)
         self.lay_arc.addStretch()
+
 # --- VENTANA PRINCIPAL ---
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -220,7 +215,6 @@ class MainWindow(QMainWindow):
             if part.device.startswith('/dev/loop') or part.fstype in ('squashfs', 'tmpfs', 'devtmpfs', ''):
                 continue
             
-            # Usar mountpoint (ej. '/') suele ser más legible para el usuario que device (ej. '/dev/sda1')
             btn = QPushButton(f"Disco ({part.mountpoint})")
             btn.clicked.connect(lambda ch, p=part.device: self.cambiar_pestaña_disco(p))
             self.sidebar_lay.addWidget(btn)
@@ -234,7 +228,7 @@ class MainWindow(QMainWindow):
         # 2. PÁGINAS
         self.paginas = QStackedWidget()
         
-        # --- PÁGINA INICIO (TUS TEXTOS ORIGINALES + MORADO) ---
+        # --- PÁGINA INICIO ---
         self.p_inicio = QWidget()
         self.p_inicio.setStyleSheet("background-color: black;")
         layout_ini = QVBoxLayout(self.p_inicio)
