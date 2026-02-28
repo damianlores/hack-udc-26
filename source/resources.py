@@ -1,6 +1,8 @@
 import psutil
 import datetime
 import time
+from collections import deque
+import datetime
 
 def save_process_data():
     attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'memory_info', 'create_time']
@@ -64,11 +66,6 @@ def obtain_process_data():
     # Ordenación descendente por uso de CPU
     return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
 
-
-
-
-from collections import deque
-import datetime
 
 class HistorialRecursos:
     def __init__(self, capacidad=5):
