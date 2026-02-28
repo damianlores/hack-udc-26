@@ -1,13 +1,14 @@
 from openai import OpenAI
 import time
+import os
+from dotenv import load_dotenv
 
-def generate_response(prompt: str) -> str:
-    """
-    api_key = os.environ.get("GROQ_API_KEY")
+
+def generate_response(prompt: str, api_key: str) -> str:
     
     if not api_key:
         raise ValueError("Environment variable GROQ_API_KEY is not set.")
-    """
+    
     api_key="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"
     client = OpenAI(
         api_key=api_key,
@@ -22,7 +23,7 @@ def generate_response(prompt: str) -> str:
     except Exception as e:
         return f"API execution failed: {str(e)}"
 
-def analyze_samples(context: str, samples: str) -> str:
+def analyze_samples(context: str, samples: str, api_key: str) -> str:
     prompt = (
         f"Eres un experto en sistemas operativos. Debes ayudar a un usuario a identificar posibles problemas de rendimiento con un análisis de datos\n"
         f"REGLAS DE ORO:\n"
@@ -35,7 +36,7 @@ def analyze_samples(context: str, samples: str) -> str:
         f"Estos son los samples:\n{samples}\n"
     )
     try:
-        response = generate_response(prompt) 
+        response = generate_response(prompt, api_key) 
         return response
     except Exception:
         return "No se pudo conectar con el analista de IA en este momento."

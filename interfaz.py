@@ -3,6 +3,7 @@ import psutil
 import datetime
 import os
 import heapq
+from dotenv import load_dotenv
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
                              QVBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame, QScrollArea, QTextEdit)
 from PyQt6.QtCore import Qt, QTimer, QPointF, QThread, pyqtSignal
@@ -13,10 +14,14 @@ from plyer import notification  # <--- Para las notificaciones de Windows/Linux
 # --- HILO GLOBAL DE PROCESOS ---
 class WorkerProcesos(QThread):
     processes_data = pyqtSignal(list, str) # Lista de procesos + mensaje IA
+    
+    def __init__(self, api_key):
+        super().__init__()
+        self.api_key = api_key
 
     def run(self):
         from resources import obtain_process_data, save_process_data, ResourceHistoric
-        from prompt import analyze_samples
+        from ai import analyze_samples
         
         historic = ResourceHistoric(capacity=5)
         context = "Sin contexto previo."
@@ -36,7 +41,7 @@ class WorkerProcesos(QThread):
                 if historic.is_ready():
                     samples = historic.build_samples()
                     # La función build_samples debe limpiar el historial tras generar el texto
-                    response = analyze_samples(context, samples)
+                    response = analyze_samples(context, samples, self.api_key)
                     context = response
                     message = response
 
@@ -343,11 +348,13 @@ class PantallaRecurso(QWidget):
 
 # --- VENTANA PRINCIPAL ---
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, api_key):
         super().__init__()
+        self.api_key = api_key
+        self.worker_global = WorkerProcesos(self.api_key)
+        
         self.setWindowTitle("Hack-UDC AI Monitor")
         self.resize(1100, 650)
-        self.worker_global = WorkerProcesos()
 
         main_layout = QHBoxLayout()
         main_layout.setSpacing(0)
@@ -439,5 +446,16 @@ class MainWindow(QMainWindow):
 
 def init_ui():
      app = QApplication(sys.argv)
-     w = MainWindow(); w.show()
+     load_dotenv()
+     api_key = os.getenv("GROQ_API_KEY")
+     
+     if not api_key:
+         print(
+             f"Error: La variable de entorno GROQ_API_KEY no está configurada.\n"
+             f"Crea un archivo .env con la línea: GROQ_API_KEY=api_key_aqui\n"
+             f"Obten tu API Key en https://console.groq.com/home"
+             )
+         sys.exit(1)
+         
+     w = MainWindow(api_key); w.show()
      sys.exit(app.exec())

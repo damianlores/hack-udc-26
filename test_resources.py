@@ -1,4 +1,4 @@
-import prompt
+import ai
 import time
 
 if __name__ == "__main__":
@@ -20,7 +20,7 @@ if __name__ == "__main__":
         if historic.is_ready():
             samples = f"Samples con intervalos de {interval}s, ordenados por uso de CPU:" + historic.build_samples()
             
-            context = prompt.analyze_samples(context, samples)
+            context = ai.analyze_samples(context, samples)
             print(context)
             
         time.sleep(interval)
