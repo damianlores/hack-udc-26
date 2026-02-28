@@ -12,8 +12,7 @@ def generate_response(prompt: str) -> str:
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1",
-    )   
-    
+    )
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -23,12 +22,14 @@ def generate_response(prompt: str) -> str:
     except Exception as e:
         return f"API execution failed: {str(e)}"
 
-def resource_analyze(cpu, ram, procesos):
+def analyze_samples(context: str, samples: str) -> str:
     prompt = (
-        f"Actúa como un experto en sistemas operativos. "
-        f"Estado actual: CPU al {cpu}%, RAM al {ram}%, y {procesos} procesos activos. "
-        "Dime de forma breve (máximo 2 frases) si el consumo es normal o si "
-        "hay algo sospechoso, y da un consejo práctico."
+        f"Actúa como un experto en sistemas operativos, que quiere ayudar a un usuario a identificar posibles problemas de rendimiento."
+        f"Es muy importante, ten en cuenta, que el usuario no sabe prácticamente nada, por tanto evita los tecnicismos."
+        f"Además, sé breve, es un texto de unas líneas integrado en una interfaz de monitoreo, no un informe detallado."
+        f"Del último análisis de procesos, has enviado la siguiente ayuda al usuario, utilízala como contexto para tu análisis:\n{context}\n"
+        f"Ahora, con base en los siguientes samples de procesos (cada uno con su PID, nombre, uso de CPU y RAM), analiza brevemente si hay alguna" 
+        f"tendencia preocupante o proceso que esté aumentando constantemente en uso de recursos:\n{samples}\n"
     )
     try:
         response = generate_response(prompt) 

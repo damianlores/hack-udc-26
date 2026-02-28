@@ -281,7 +281,11 @@ class MainWindow(QMainWindow):
         self.sidebar_lay.addWidget(self.btn_ram)
 
         for part in psutil.disk_partitions(all=False):
-            if part.fstype in ('squashfs', 'tmpfs', ''): continue
+            if part.fstype in ('squashfs', 'tmpfs', ''): 
+                continue
+            # MacOS system volumes ignore
+            if "/System/Volumes" in part.mountpoint and not part.mountpoint.endswith("/Data"):
+                continue
             btn = QPushButton(f"Disco ({part.mountpoint})")
             btn.clicked.connect(lambda ch, p=part.mountpoint: self.cambiar_pestaña_disco(p))
             self.sidebar_lay.addWidget(btn)
