@@ -27,9 +27,10 @@ def analyze_samples(context: str, samples: str) -> str:
         f"Actúa como un experto en sistemas operativos, que quiere ayudar a un usuario a identificar posibles problemas de rendimiento."
         f"Es muy importante, ten en cuenta, que el usuario no sabe prácticamente nada, por tanto evita los tecnicismos."
         f"Además, sé breve, es un texto de unas líneas integrado en una interfaz de monitoreo, no un informe detallado."
+        f"Al ser por tanto parte de una interfaz, debes NO incluir cabeceras"
         f"Del último análisis de procesos, has enviado la siguiente ayuda al usuario, utilízala como contexto para tu análisis:\n{context}\n"
-        f"Ahora, con base en los siguientes samples de procesos (cada uno con su PID, nombre, uso de CPU y RAM), analiza brevemente si hay alguna" 
-        f"tendencia preocupante o proceso que esté aumentando constantemente en uso de recursos:\n{samples}\n"
+        f"Ahora, con base en los siguientes samples de procesos analiza brevemente si hay alguna tendencia preocupante o proceso que esté aumentando constantemente en uso de recursos:\n{samples}\n"
+        f"En caso de que tu conclusión sea que hay un comportamiento SOSPECHOSO o ANÓMALO (ej. procesos que suben sin parar), empieza tu respuesta obligatoriamente con la palabra 'ALERTA:'. Si es normal, no uses esa palabra."
     )
     try:
         response = generate_response(prompt) 
