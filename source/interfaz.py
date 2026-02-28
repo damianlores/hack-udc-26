@@ -289,15 +289,17 @@ class MainWindow(QMainWindow):
         texto_ini = QLabel(
             "<h1 style='color: white; font-size: 32px; margin-bottom: 10px;'>Monitor de Salud Inteligente</h1>"
             "<p style='font-size: 18px; color: #cccccc; line-height: 1.5;'>"
-            "Este sistema utiliza Inteligencia Artificial para supervisar hardware en tiempo real.</p>"
+            "Este sistema utiliza <b>Inteligencia Artificial</b> para supervisar tu hardware en tiempo real "
+            "basándose en los datos de <b>/proc</b>.</p>"
             "<div style='background-color: #1a1a1a; padding: 20px; border-radius: 10px; margin-top: 20px; border: 1px solid #333;'>"
             "<h3 style='color: white; font-size: 22px;'>¿Cómo interpretar los colores?</h3>"
             "<ul style='font-size: 18px; line-height: 1.8; color: #cccccc;'>"
-            "<li><span style='color: #3498db;'>■</span> <b>Zona Azul:</b> Rango normal calculado.</li>"
-            "<li><span style='color: #2ecc71;'>■</span> <b>Línea Verde:</b> Consumo correcto.</li>"
-            "<li><span style='color: #e74c3c;'>■</span> <b>Línea Roja:</b> Anomalía detectada.</li>"
+            "<li><span style='color: #3498db;'>■</span> <b>Zona Azul:</b> El rango normal calculado por la IA basándose en tu historial.</li>"
+            "<li><span style='color: #2ecc71;'>■</span> <b>Línea Verde:</b> El consumo actual es correcto y está dentro del rango.</li>"
+            "<li><span style='color: #e74c3c;'>■</span> <b>Línea Roja:</b> <b>¡Anomalía detectada!</b> La aplicación consume más de lo habitual.</li>"
             "<li><span style='color: #9b59b6;'>■</span> <b>Barra Morada:</b> Ocupación de disco físico.</li>"
-            "</ul></div>"
+            "</ul>"
+            "</div>"
         )
         texto_ini.setWordWrap(True)
         layout_ini.addWidget(texto_ini)
