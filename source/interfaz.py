@@ -1,141 +1,88 @@
-import database  # Esto busca el archivo database.py (antes historial.py)
-import ia_engine # Esto busca tu lógica de IA
+import gi
+gi.require_version("Gtk", "3.0") # Usamos 3.0 por ser la más estable en Python
+from gi.repository import Gtk, Pango
 
-import sys
-import psutil
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                             QVBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame)
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPainter, QColor, QPen
-
-# --- REUTILIZAMOS TU BARRA PERSONALIZADA ---
-class BarraProcesoPro(QWidget):
-    def __init__(self, nombre, valor_actual, r_min, r_max):
-        super().__init__()
-        self.nombre, self.valor, self.r_min, self.r_max = nombre, valor_actual, r_min, r_max
-        self.setMinimumHeight(50)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        ancho, alto = self.width() - 40, 20
-        x_ini, y_ini = 10, 25
-        painter.setBrush(QColor("white"))
-        painter.drawRect(x_ini, y_ini, ancho, alto)
-        x_azul = x_ini + int((self.r_min / 100) * ancho)
-        ancho_azul = int(((self.r_max - self.r_min) / 100) * ancho)
-        painter.setBrush(QColor(52, 152, 219, 100))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(x_azul, y_ini + 1, ancho_azul, alto - 1)
-        esta_dentro = self.r_min <= self.valor <= self.r_max
-        color_linea = QColor("#2ecc71") if esta_dentro else QColor("#e74c3c")
-        emoji = "✅" if esta_dentro else "⚠️"
-        x_valor = x_ini + int((self.valor / 100) * ancho)
-        painter.setPen(QPen(color_linea, 4))
-        painter.drawLine(x_valor, y_ini - 2, x_valor, y_ini + alto + 2)
-        painter.setPen(QColor("black"))
-        painter.drawText(x_ini, 15, f"{emoji} {self.nombre}: {self.valor}%")
-
-# --- NUEVA CLASE PARA LA PANTALLA DE RECURSOS ---
-class PantallaRecurso(QWidget):
-    def __init__(self, titulo):
-        super().__init__()
-        layout = QHBoxLayout()
-        col_izq = QVBoxLayout()
-        
-        # Título y placeholder de gráfica
-        self.lbl = QLabel(f"Análisis en tiempo real: {titulo}")
-        self.lbl.setStyleSheet("font-size: 20px; font-weight: bold;")
-        col_izq.addWidget(self.lbl)
-        
-        grafica = QFrame()
-        grafica.setStyleSheet("background: white; border: 1px solid #ccc; border-radius: 5px;")
-        grafica.setMinimumHeight(300)
-        col_izq.addWidget(grafica)
-        
-        # Alertas a la derecha (según tu dibujo)
-        col_der = QVBoxLayout()
-        col_der.addWidget(QLabel("Alertas de procesos"))
-        col_der.addWidget(BarraProcesoPro("Firefox", 85, 10, 40))
-        col_der.addWidget(BarraProcesoPro("System", 20, 5, 30))
-        col_der.addStretch()
-        
-        layout.addLayout(col_izq, stretch=2)
-        layout.addLayout(col_der, stretch=1)
-        self.setLayout(layout)
-
-# --- VENTANA PRINCIPAL ---
-class MainWindow(QMainWindow):
+class MonitorSistemaIA(Gtk.Window):
     def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Hack-UDC AI Monitor")
-        self.resize(1100, 600)
+        super().__init__(title="AI System Health Monitor")
+        self.set_default_size(1000, 600)
 
-        main_layout = QHBoxLayout()
-        
-        # 1. BARRA LATERAL
-        self.sidebar = QVBoxLayout()
-        self.btn_inicio = QPushButton("🏠 Inicio")
-        self.btn_cpu = QPushButton("📊 CPU")
-        self.btn_ram = QPushButton("🧠 Memoria")
-        
-        self.sidebar.addWidget(self.btn_inicio)
-        self.sidebar.addWidget(self.btn_cpu)
-        self.sidebar.addWidget(self.btn_ram)
-        
-        # Detectar Discos automáticamente
-        for part in psutil.disk_partitions():
-            if 'fixed' in part.opts or part.fstype:
-                btn = QPushButton(f"💾 Disco ({part.device})")
-                btn.clicked.connect(lambda ch, p=part.device: self.cambiar_pestaña_disco(p))
-                self.sidebar.addWidget(btn)
-        
-        self.sidebar.addStretch()
-        
-        # 2. CONTENEDOR DE PÁGINAS (Stacked Widget)
-        self.paginas = QStackedWidget()
-        
-        # Pagina de Inicio
-        self.p_inicio = QWidget()
-        layout_ini = QVBoxLayout()
-        texto_ini = QLabel("<h2>Bienvenido al Monitor de Salud con IA</h2>"
-                           "<p>Este programa recolecta métricas del sistema (/proc).</p>"
-                           "<ul>"
-                           "<li><b>Análisis:</b> Compara el uso actual con tu media histórica.</li>"
-                           "<li><b>Detección:</b> Marca anomalías en rojo si el consumo es inusual.</li>"
-                           "<li><b>Acción:</b> Sugiere optimizaciones para mejorar el rendimiento.</li>"
-                           "</ul>")
-        texto_ini.setWordWrap(True)
-        layout_ini.addWidget(texto_ini)
-        self.p_inicio.setLayout(layout_ini)
-        
-        # Añadir páginas
-        self.paginas.addWidget(self.p_inicio)
-        self.paginas.addWidget(PantallaRecurso("CPU"))
-        self.paginas.addWidget(PantallaRecurso("Memoria"))
+        # 1. Contenedor principal Horizontal (Divide Menú de Contenido)
+        # Esto crea la línea divisoria física que pedías
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.add(self.main_box)
 
-        # Conectar botones
-        self.btn_inicio.clicked.connect(lambda: self.paginas.setCurrentIndex(0))
-        self.btn_cpu.clicked.connect(lambda: self.paginas.setCurrentIndex(1))
-        self.btn_ram.clicked.connect(lambda: self.paginas.setCurrentIndex(2))
+        # 2. BARRA LATERAL (Índice)
+        self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.sidebar.set_size_request(200, -1)
+        self.sidebar.get_style_context().add_class("sidebar") # Para CSS luego
+        self.main_box.pack_start(self.sidebar, False, False, 0)
 
-        # Layout final
-        container = QWidget()
-        main_layout.addLayout(self.sidebar, 1)
-        main_layout.addWidget(self.paginas, 4)
-        container.setLayout(main_layout)
-        self.setCentralWidget(container)
+        # Añadimos un separador vertical (Línea divisoria visual)
+        separador = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        self.main_box.pack_start(separador, False, False, 0)
 
-    def cambiar_pestaña_disco(self, nombre):
-        # Aquí crearíamos una nueva página para cada disco
-        nueva_p_disco = PantallaRecurso(f"Disco {nombre}")
-        self.paginas.addWidget(nueva_p_disco)
-        self.paginas.setCurrentWidget(nueva_p_disco)
+        # 3. PANEL DE PÁGINAS (Stack)
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        self.main_box.pack_start(self.stack, True, True, 0)
+
+        # Conectar el índice con las páginas
+        sidebar_menu = Gtk.StackSidebar()
+        sidebar_menu.set_stack(self.stack)
+        self.sidebar.pack_start(sidebar_menu, True, True, 0)
+
+        # --- CREACIÓN DE PÁGINAS ---
+        self.crear_pagina_inicio()
+        self.crear_pagina_recurso("CPU")
+        self.crear_pagina_recurso("Memoria")
+
+        self.show_all()
+
+    def crear_pagina_inicio(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        box.set_margin_top(30)
+        box.set_margin_start(30)
+
+        # Texto de Inicio Grande (Título)
+        titulo = Gtk.Label()
+        titulo.set_markup("<span size='xx-large' weight='bold' foreground='#1a237e'>Monitor de Salud Inteligente</span>")
+        titulo.set_xalign(0)
+        box.pack_start(titulo, False, False, 0)
+
+        # Descripción basada en el Roadmap
+        desc = Gtk.Label()
+        desc.set_markup(
+            "Este sistema recolecta métricas de <b>/proc</b> y utiliza IA para detectar anomalías.\n\n"
+            "<b>Instrucciones:</b>\n"
+            "1. Selecciona un recurso en la izquierda.\n"
+            "2. Observa la gráfica de consumo en tiempo real.\n"
+            "3. Revisa las alertas si el consumo sale del rango normal."
+        )
+        desc.set_line_wrap(True)
+        desc.set_xalign(0)
+        box.pack_start(desc, False, False, 0)
+
+        self.stack.add_titled(box, "inicio", "🏠 Inicio")
+
+    def crear_pagina_recurso(self, nombre):
+        # Aquí iría tu diseño de: [Gráfica | Alertas]
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        
+        # Lado izquierdo: Espacio para Gráfica
+        area_grafica = Gtk.Frame(label=f"Gráfica de {nombre}")
+        area_grafica.set_shadow_type(Gtk.ShadowType.IN)
+        box.pack_start(area_grafica, True, True, 10)
+
+        # Lado derecho: Alertas (tus barras del dibujo)
+        alertas_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        alertas_box.pack_start(Gtk.Label(label="Alertas detectadas"), False, False, 5)
+        # Aquí añadiríamos las barras personalizadas más adelante
+        box.pack_start(alertas_box, False, False, 10)
+
+        self.stack.add_titled(box, nombre.lower(), f"📊 {nombre}")
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    # Estilo básico para botones
-    app.setStyleSheet("QPushButton { text-align: left; padding: 10px; font-size: 14px; border: none; }"
-                      "QPushButton:hover { background-color: #dcdde1; }")
-    w = MainWindow()
-    w.show()
-    sys.exit(app.exec())
+    win = MonitorSistemaIA()
+    win.connect("destroy", Gtk.main_quit)
+    Gtk.main()
