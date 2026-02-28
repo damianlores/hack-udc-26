@@ -43,13 +43,18 @@ def metric_register(conexion):
     conexion.commit()
     print(f"Registro guardado: CPU {cpu}% | RAM {ram}% | Procesos {procesos}")
 
-# --- Ejecución de prueba ---
-if __name__ == "__main__":
-    conn = init_database()
-    
-    # Simulación de recolección continua (ejecutar 3 veces)
-    for _ in range(3):
-        metric_register(conn)
-        time.sleep(1)
-        
-    conn.close()
+
+def get_latest_metrics(conexion):
+    """
+    Recupera el registro más reciente de la tabla metric_historic.
+    Retorna una tupla: (cpu, ram, procesos) o None si está vacía.
+    """
+    cursor = conexion.cursor()
+    cursor.execute('''
+        SELECT cpu_global, ram_global, total_procesos 
+        FROM metric_historic 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    ''')
+    resultado = cursor.fetchone()
+    return resultado
