@@ -9,7 +9,6 @@ def generate_response(prompt: str, api_key: str) -> str:
     if not api_key:
         raise ValueError("Environment variable GROQ_API_KEY is not set.")
     
-    api_key="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"
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1",
