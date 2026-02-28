@@ -1,6 +1,6 @@
 import sys
 import psutil
-import random
+import datetime
 import os
 import heapq
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
@@ -13,11 +13,9 @@ class WorkerProcesos(QThread):
     datos_actualizados = pyqtSignal(list)
 
     def run(self):
-        # Asumimos que resources.py existe y tiene obtain_process_data
         try:
             from resources import obtain_process_data
         except ImportError:
-            # Fallback por si no tienes el archivo para probar
             def obtain_process_data(): return []
 
         while True:
@@ -75,7 +73,7 @@ class BarraDiscoReal(QWidget):
         painter.setPen(QColor("#aaaaaa"))
         painter.drawText(x_ini, y_ini + alto_b + 20, f"{self.usado_gb:.1f}GB / {self.total_gb:.1f}GB ({self.porcentaje}%)")
 
-# --- GRÁFICA ANIMADA (Lógica mantenida para tu compañero) ---
+# --- GRÁFICA ANIMADA ---
 class GraficaAnimada(QWidget):
     def __init__(self):
         super().__init__()
@@ -135,10 +133,11 @@ class BarraProcesoPro(QWidget):
         painter.setBrush(color_linea)
         painter.drawRect(x_ini, y_ini, x_valor - x_ini, alto_barra)
 
-# --- PANTALLA DE RECURSOS (MODIFICADA) ---
+# --- PANTALLA DE RECURSOS (MODIFICADA CON DATOS REALES) ---
 class PantallaRecurso(QWidget):
     def __init__(self, titulo, es_disco=False, ruta=""):
         super().__init__()
+        self.titulo = titulo
         self.setStyleSheet("background-color: #0b0b0b;")
         layout_principal = QVBoxLayout(self)
         content_h = QHBoxLayout()
@@ -177,49 +176,51 @@ class PantallaRecurso(QWidget):
             content_h.addWidget(tips)
             
         else:
-            # --- MEJORA: REEMPLAZO DE "ANÁLISIS: CPU" GIGANTE ---
             col_izq.addWidget(QLabel(f"Monitor de {titulo}", styleSheet="color: white; font-size: 22px; font-weight: bold; margin-bottom: 5px;"))
             
-            # Panel de KPIs (Tarjetas de métricas)
+            # Panel de KPIs
             panel_kpi = QFrame()
             panel_kpi.setStyleSheet("background-color: #1a1a1a; border-radius: 12px; border: 1px solid #333;")
             lay_kpi = QHBoxLayout(panel_kpi)
             lay_kpi.setContentsMargins(20, 15, 20, 15)
             
+            # Cálculo de Uptime (Tiempo de uso del sistema)
+            uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
+            uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
+
             if titulo == "CPU":
                 val_principal = f"{psutil.cpu_percent()}%"
-                val_sub = f"Núcleos: {psutil.cpu_count()}"
+                val_hardware = f"{psutil.cpu_count(logical=False)} núcleos / {psutil.cpu_count()} hilos"
                 lbl_desc = "Carga Total"
             else:
                 mem = psutil.virtual_memory()
                 val_principal = f"{mem.percent}%"
-                val_sub = f"Libre: {mem.available / (1024**3):.1f} GB"
+                # Equivalente en hardware para RAM (Slots/Total)
+                val_hardware = f"{mem.total / (1024**3):.1f} GB Instalados"
                 lbl_desc = "Uso de RAM"
 
-            # Tarjeta 1
+            # Tarjeta 1: Carga/Uso
             card1 = QVBoxLayout(); card1.addWidget(QLabel(lbl_desc, styleSheet="color: #888; font-size: 12px;"))
             card1.addWidget(QLabel(val_principal, styleSheet="color: white; font-size: 26px; font-weight: bold;"))
-            # Tarjeta 2
+            
+            # Tarjeta 2: Hardware (Núcleos/Hilos o RAM Total)
             card2 = QVBoxLayout(); card2.addWidget(QLabel("Hardware", styleSheet="color: #888; font-size: 12px;"))
-            card2.addWidget(QLabel(val_sub, styleSheet="color: #3498db; font-size: 15px; font-weight: bold;"))
-            # Tarjeta 3
-            card3 = QVBoxLayout(); card3.addWidget(QLabel("Estado IA", styleSheet="color: #888; font-size: 12px;"))
-            card3.addWidget(QLabel("🟢 Óptimo", styleSheet="color: #2ecc71; font-size: 15px; font-weight: bold;"))
+            card2.addWidget(QLabel(val_hardware, styleSheet="color: #3498db; font-size: 15px; font-weight: bold;"))
+            
+            # Tarjeta 3: Tiempo de uso (Uptime)
+            card3 = QVBoxLayout(); card3.addWidget(QLabel("Tiempo de Uso", styleSheet="color: #888; font-size: 12px;"))
+            card3.addWidget(QLabel(uptime_str, styleSheet="color: #f1c40f; font-size: 15px; font-weight: bold;"))
 
             lay_kpi.addLayout(card1); lay_kpi.addLayout(card2); lay_kpi.addLayout(card3)
             col_izq.addWidget(panel_kpi)
 
-            # Referencia para la gráfica
             lbl_graph = QLabel("Histórico de rendimiento:")
             lbl_graph.setStyleSheet("color: #666; font-size: 12px; margin-top: 10px;")
             col_izq.addWidget(lbl_graph)
-            
             col_izq.addWidget(GraficaAnimada())
 
-            # Columna procesos
             col_der = QVBoxLayout()
             col_der.addWidget(QLabel("Procesos Activos", styleSheet="color: white; font-weight: bold; font-size: 16px;"))
-            
             self.scroll = QScrollArea()
             self.scroll.setWidgetResizable(True)
             self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
