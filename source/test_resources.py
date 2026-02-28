@@ -5,23 +5,23 @@ if __name__ == "__main__":
     
     from resources import ResourceHistoric
     historic = ResourceHistoric(capacity=5)
-    context = f"Por ahora no hay contexto previo, pues es el primer análisis."
+    context = f"No hay contexto todavia"
+    interval = 5  # seconds between samples
     
     from resources import save_process_data
     from prompt import generate_response
         
     while True:
-        # 1. Recopila los datos usando save_process_data
+        # get top 10 most consuming processses data
         processes = save_process_data()[:10]
-            
-        # 2. Almacena el sample actual
+        
+        # save info in the historic
         historic.save_sample(processes)
-            
-        # 3. Solo pide el prompt si ya hay 5 samples
+        
         if historic.is_ready():
-            samples = historic.build_samples()
-            context = prompt.analyze_samples(context, samples)
+            samples = f"Samples con intervalos de {interval}s, ordenados por uso de CPU:" + historic.build_samples()
             
+            context = prompt.analyze_samples(context, samples)
             print(context)
             
-        time.sleep(1)
+        time.sleep(interval)

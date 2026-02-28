@@ -89,10 +89,10 @@ class ResourceHistoric:
         """Genera el texto estructurado para el prompt."""
         text = f""
         for i, m in enumerate(self.samples):
-            text += f"\nSample {i+1} [{m['timestamp']}]:\n"
+            text += f"Sample {i+1}:\n"
             
             for p in m['procesos']:
-                text += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_percent']}MB\n"
+                text += f" {p['name']} CPU {p['cpu_percent']}% RAM {p['mem_percent']}MB\n"
             # cleanup after building the text to avoid keeping old samples in memory
             self.samples = []
         return text
