@@ -9,56 +9,99 @@ from PyQt6.QtGui import QPainter, QColor, QPen
 class BarraProcesoPro(QWidget):
     def __init__(self, nombre, valor_actual, r_min, r_max):
         super().__init__()
-        self.nombre, self.valor, self.r_min, self.r_max = nombre, valor_actual, r_min, r_max
-        self.setMinimumHeight(50)
+        self.nombre = nombre
+        self.valor = valor_actual
+        self.r_min = r_min
+        self.r_max = r_max
+        # Aumentamos el alto para que el texto no se corte
+        self.setMinimumHeight(65) 
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        ancho, alto = self.width() - 40, 20
-        x_ini, y_ini = 10, 25
-        painter.setBrush(QColor("white"))
-        painter.drawRect(x_ini, y_ini, ancho, alto)
-        x_azul = x_ini + int((self.r_min / 100) * ancho)
-        ancho_azul = int(((self.r_max - self.r_min) / 100) * ancho)
-        painter.setBrush(QColor(52, 152, 219, 100))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(x_azul, y_ini + 1, ancho_azul, alto - 1)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing) # Suaviza las líneas
+        
+        ancho = self.width() - 40
+        alto_barra = 20
+        x_ini = 10
+        y_ini = 35 # Bajamos la barra para dejar espacio al texto arriba
+        
+        # 1. Dibujar el texto del proceso (Blanco)
         esta_dentro = self.r_min <= self.valor <= self.r_max
         color_linea = QColor("#2ecc71") if esta_dentro else QColor("#e74c3c")
         emoji = "✅" if esta_dentro else "⚠️"
+        
+        painter.setPen(QColor("white"))
+        font = painter.font()
+        font.setBold(True)
+        painter.setFont(font)
+        # Aquí es donde se dibuja "Firefox", "WhatsApp", etc.
+        painter.drawText(x_ini, 20, f"{emoji} {self.nombre}: {self.valor}%")
+        
+        # 2. Fondo blanco de la barra
+        painter.setBrush(QColor("white"))
+        painter.setPen(QPen(QColor("#555555"), 1))
+        painter.drawRect(x_ini, y_ini, ancho, alto_barra)
+        
+        # 3. Rango azul de la IA
+        x_azul = x_ini + int((self.r_min / 100) * ancho)
+        ancho_azul = int(((self.r_max - self.r_min) / 100) * ancho)
+        painter.setBrush(QColor(52, 152, 219, 130))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(x_azul, y_ini + 1, ancho_azul, alto_barra - 1)
+        
+        # 4. Línea indicadora de consumo
         x_valor = x_ini + int((self.valor / 100) * ancho)
         painter.setPen(QPen(color_linea, 4))
-        painter.drawLine(x_valor, y_ini - 2, x_valor, y_ini + alto + 2)
-        painter.setPen(QColor("black"))
-        painter.drawText(x_ini, 15, f"{emoji} {self.nombre}: {self.valor}%")
+        painter.drawLine(x_valor, y_ini - 4, x_valor, y_ini + alto_barra + 4)
 
 # --- NUEVA CLASE PARA LA PANTALLA DE RECURSOS ---
 class PantallaRecurso(QWidget):
     def __init__(self, titulo):
         super().__init__()
-        layout = QHBoxLayout()
-        col_izq = QVBoxLayout()
+        # Fondo negro para que combine con Inicio
+        self.setStyleSheet("background-color: #0b0b0b;") 
         
-        # Título y placeholder de gráfica
-        self.lbl = QLabel(f"Análisis en tiempo real: {titulo}")
-        self.lbl.setStyleSheet("font-size: 20px; font-weight: bold;")
-        col_izq.addWidget(self.lbl)
+        layout_principal = QVBoxLayout() # Layout vertical para poner el Score arriba
+
+        # --- SALUD DEL DISPOSITIVO (Health Score) ---
+        # Tal como aparece en tu dibujo arriba a la izquierda
+        self.lbl_score = QLabel("Health Score: 92%")
+        self.lbl_score.setStyleSheet("font-size: 28px; font-weight: bold; color: #2ecc71; padding: 10px;")
+        layout_principal.addWidget(self.lbl_score)
+
+        # Contenedor horizontal para Gráfica | Alertas
+        layout_h = QHBoxLayout()
+        
+        # Columna Izquierda: Gráfica
+        col_izq = QVBoxLayout()
+        self.lbl_tit = QLabel(f"Análisis en tiempo real: {titulo}")
+        self.lbl_tit.setStyleSheet("font-size: 18px; color: white;")
+        col_izq.addWidget(self.lbl_tit)
         
         grafica = QFrame()
-        grafica.setStyleSheet("background: white; border: 1px solid #ccc; border-radius: 5px;")
+        grafica.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 5px;")
         grafica.setMinimumHeight(300)
         col_izq.addWidget(grafica)
         
-        # Alertas a la derecha (según tu dibujo)
-        col_der = QVBoxLayout()
-        col_der.addWidget(QLabel("Alertas de procesos"))
+        # Columna Derecha: Alertas (Usamos un QWidget para fijar el ancho)
+        alertas_widget = QWidget()
+        alertas_widget.setFixedWidth(280)
+        col_der = QVBoxLayout(alertas_widget)
+        
+        lbl_alertas = QLabel("Alertas de procesos")
+        lbl_alertas.setStyleSheet("color: white; font-weight: bold; font-size: 18px;")
+        col_der.addWidget(lbl_alertas)
+        
+        # Añadimos los procesos (ahora se verán blancos)
         col_der.addWidget(BarraProcesoPro("Firefox", 85, 10, 40))
         col_der.addWidget(BarraProcesoPro("System", 20, 5, 30))
         col_der.addStretch()
         
-        layout.addLayout(col_izq, stretch=2)
-        layout.addLayout(col_der, stretch=1)
-        self.setLayout(layout)
+        layout_h.addLayout(col_izq, stretch=2)
+        layout_h.addWidget(alertas_widget)
+        
+        layout_principal.addLayout(layout_h)
+        self.setLayout(layout_principal)
 
 # --- VENTANA PRINCIPAL ---
 class MainWindow(QMainWindow):
