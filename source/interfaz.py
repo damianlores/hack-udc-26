@@ -175,19 +175,18 @@ class PantallaRecurso(QWidget):
             self.worker_disk.finalizado.connect(self.actualizar_archivos)
             self.worker_disk.start()
         else:
-            # --- SECCIÓN KPI COMPACTADA (Cambio solicitado para CPU/Memoria) ---
+            # --- TÍTULO ARRIBA ---
             lbl_tit = QLabel(f"Monitor: {titulo}")
-            lbl_tit.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
-            lbl_tit.setMaximumHeight(25)
+            lbl_tit.setStyleSheet("color: white; font-size: 20px; font-weight: bold; margin-bottom: 5px;")
+            lbl_tit.setMaximumHeight(35)
             col_izq.addWidget(lbl_tit)
             
+            # --- PANEL KPI COMPACTO ---
             panel_kpi = QFrame()
             panel_kpi.setStyleSheet("background-color: #1a1a1a; border-radius: 12px; border: 1px solid #333;")
-            # Reducimos la altura máxima del panel de KPIs
-            panel_kpi.setMaximumHeight(85) 
+            panel_kpi.setMaximumHeight(80) 
             lay_kpi = QHBoxLayout(panel_kpi)
-            # Reducimos márgenes internos para que sea más pequeño de alto
-            lay_kpi.setContentsMargins(15, 8, 15, 8) 
+            lay_kpi.setContentsMargins(15, 5, 15, 5) 
 
             uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
             uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
@@ -208,17 +207,24 @@ class PantallaRecurso(QWidget):
                 ("Tiempo de Uso", uptime_str, "#f1c40f")
             ]:
                 v_lay = QVBoxLayout()
-                v_lay.setSpacing(2) # Espacio mínimo entre etiquetas
-                v_lay.addWidget(QLabel(t_tit, styleSheet="color: #bbb; font-size: 11px; font-weight: 500;"))
+                v_lay.setSpacing(0)
+                v_lay.addWidget(QLabel(t_tit, styleSheet="color: #bbb; font-size: 11px;"))
                 v_lay.addWidget(QLabel(t_val, styleSheet=f"color: {t_col}; font-size: 16px; font-weight: bold;"))
                 lay_kpi.addLayout(v_lay)
             col_izq.addWidget(panel_kpi)
 
+            # --- GRÁFICA ---
             self.grafica = GraficaAnimada()
             self.grafica.setFixedHeight(180)
             col_izq.addWidget(self.grafica)
+            
+            # ESTIRAMIENTO FINAL: Esto empuja todo lo anterior hacia arriba
+            col_izq.addStretch()
 
-            col_der.addWidget(QLabel("Procesos Activos", styleSheet="color: white; font-weight: bold;"))
+            # --- COLUMNA DERECHA (PROCESOS) ---
+            lbl_proc_tit = QLabel("Procesos Activos")
+            lbl_proc_tit.setStyleSheet("color: white; font-weight: bold; margin-top: 5px;")
+            col_der.addWidget(lbl_proc_tit)
             self.scroll = QScrollArea()
             self.scroll.setWidgetResizable(True)
             self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -231,10 +237,10 @@ class PantallaRecurso(QWidget):
         content_h.addLayout(col_der, stretch=1)
         layout_principal.addLayout(content_h)
 
-        # Recuadro morado para la IA
+        # Recuadro morado para la IA al fondo
         self.panel_ia = QFrame()
         self.panel_ia.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
-        self.panel_ia.setMinimumHeight(100)
+        self.panel_ia.setFixedHeight(80)
         layout_principal.addWidget(self.panel_ia)
 
     def refrescar_lista_procesos(self, lista):
@@ -320,7 +326,6 @@ class MainWindow(QMainWindow):
         layout_ini = QVBoxLayout(w)
         layout_ini.setContentsMargins(40, 40, 40, 40)
         
-        # 1. Recuperación del texto original solicitado
         texto_html = (
             "<h1 style='color: white; font-size: 32px; margin-bottom: 10px;'>Monitor de Salud Inteligente</h1>"
             "<p style='font-size: 18px; color: #cccccc; line-height: 1.5;'>"
@@ -341,10 +346,9 @@ class MainWindow(QMainWindow):
         layout_ini.addWidget(lbl_inicio)
         layout_ini.addStretch()
 
-        # 2. Recuadro morado de IA para la pantalla de inicio
         panel_ia_inicio = QFrame()
         panel_ia_inicio.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
-        panel_ia_inicio.setMinimumHeight(100)
+        panel_ia_inicio.setFixedHeight(100)
         layout_ini.addWidget(panel_ia_inicio)
         
         return w
