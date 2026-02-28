@@ -94,3 +94,44 @@ class HistorialRecursos:
             for p in m['procesos']:
                 texto += f"- {p['name']} (PID: {p['pid']}): CPU {p['cpu_percent']}%, RAM {p['mem_mb']}MB\n"
         return texto
+
+
+
+# interfaz.py
+class WorkerProcesos(QThread):
+    datos_actualizados = pyqtSignal(list, str)
+
+    def __init__(self):
+        super().__init__()
+        from resources import HistorialRecursos
+        self.historial = HistorialRecursos(capacidad=5)
+
+    def run(self):
+        from resources import save_process_data
+        from prompt import generate_response
+        
+        while True:
+            # 1. Recopila los datos usando save_process_data
+            datos_completos = save_process_data()
+            top_10 = datos_completos[:10]
+            
+            # 2. Almacena el sample actual
+            self.historial.registrar_muestreo(top_10)
+            
+            analisis_ia = "Recopilando datos iniciales (Muestreo {}/5)...".format(len(self.historial.muestreos))
+            
+            # 3. Solo pide el prompt si ya hay 5 samples
+            if self.historial.esta_listo():
+                prompt_input = self.historial.formatear_para_ia()
+                instruccion = (
+                    f"Analiza estos 5 samples de procesos:\n{prompt_input}\n"
+                    "Determina si hay algún proceso cuya CPU o RAM esté aumentando constantemente. "
+                    "Responde brevemente."
+                )
+                analisis_ia = generate_response(instruccion)
+            
+            # 4. Actualiza la UI con los 10 procesos y el estado de la IA
+            self.datos_actualizados.emit(top_10, analisis_ia)
+            
+            # Pausa de 3 segundos entre capturas
+            self.msleep(3000)
