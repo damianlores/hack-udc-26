@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 
 def generate_response(prompt: str, api_key: str) -> str:
-    
+    # given a prompt and an API key, this function generates a response using the OpenAI API
     if not api_key:
         raise ValueError("Environment variable GROQ_API_KEY is not set.")
     
