@@ -195,8 +195,13 @@ class PantallaRecurso(QWidget):
             else:
                 mem = psutil.virtual_memory()
                 val_principal = f"{mem.percent}%"
-                # Equivalente en hardware para RAM (Slots/Total)
-                val_hardware = f"{mem.total / (1024**3):.1f} GB Instalados"
+                
+                # --- CAMBIO AQUÍ: Uso Real / Total ---
+                usado = mem.used / (1024**3)
+                total = mem.total / (1024**3)
+                val_hardware = f"{usado:.1f} / {total:.1f} GB"
+                # -------------------------------------
+                
                 lbl_desc = "Uso de RAM"
 
             # Tarjeta 1: Carga/Uso
