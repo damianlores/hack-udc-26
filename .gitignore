@@ -27,3 +27,4 @@ replay_pid*
 __pycache__/
 *.db
 .venv/lib/python3.*/site-packages
+RECORD
