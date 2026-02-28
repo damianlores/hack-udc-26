@@ -1,5 +1,5 @@
 import prompt
-import database
+from database import init_database, metric_register, get_latest_metrics
 import time
 
 # --- Ejecución de prueba ---
