@@ -34,7 +34,7 @@ class WorkerEscaneo(QThread):
         self.ruta = ruta
     def run(self):
         archivos_grandes = []
-        ruta_base = os.path.expanduser("~") if self.ruta.startswith(("C", "/")) else self.ruta
+        ruta_base = self.ruta if os.path.exists(self.ruta) else os.path.expanduser("~")
         try:
             for root, dirs, files in os.walk(ruta_base):
                 for f in files:
@@ -44,7 +44,7 @@ class WorkerEscaneo(QThread):
                         archivos_grandes.append((size, f))
                     except: continue
                 if len(archivos_grandes) > 1000: break 
-            top_5 = heapq.nlargest(5, archivos_grandes)
+            top_5 = heapq.nlargest(10, archivos_grandes)
             self.finalizado.emit(top_5)
         except: self.finalizado.emit([])
 
@@ -54,10 +54,13 @@ class BarraDiscoReal(QWidget):
         super().__init__()
         self.ruta = ruta
         self.setMinimumHeight(100)
-        uso = psutil.disk_usage(self.ruta)
-        self.total_gb = uso.total / (1024**3)
-        self.usado_gb = uso.used / (1024**3)
-        self.porcentaje = uso.percent
+        try:
+            uso = psutil.disk_usage(self.ruta)
+            self.total_gb = uso.total / (1024**3)
+            self.usado_gb = uso.used / (1024**3)
+            self.porcentaje = uso.percent
+        except:
+            self.total_gb, self.usado_gb, self.porcentaje = 0, 0, 0
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -97,7 +100,6 @@ class GraficaAnimada(QWidget):
         paso_x = ancho / 49
         y_max = alto - (self.r_max / 100 * alto)
         y_min = alto - (self.r_min / 100 * alto)
-        painter.setBrush(QColor(52, 152, 219, 40))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, int(y_max), ancho, int(y_min - y_max))
         poly = QPolygonF()
@@ -133,15 +135,18 @@ class BarraProcesoPro(QWidget):
         painter.setBrush(color_linea)
         painter.drawRect(x_ini, y_ini, x_valor - x_ini, alto_barra)
 
-# --- PANTALLA DE RECURSOS (MODIFICADA CON DATOS REALES) ---
+# --- PANTALLA DE RECURSOS ---
 class PantallaRecurso(QWidget):
     def __init__(self, titulo, es_disco=False, ruta=""):
         super().__init__()
         self.titulo = titulo
         self.setStyleSheet("background-color: #0b0b0b;")
         layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(15, 10, 15, 10) 
+        
         content_h = QHBoxLayout()
         col_izq = QVBoxLayout()
+        col_der = QVBoxLayout()
         
         if es_disco:
             col_izq.addWidget(BarraDiscoReal(ruta))
@@ -152,39 +157,37 @@ class PantallaRecurso(QWidget):
             self.lbl_load.setStyleSheet("color: #9b59b6;")
             self.lay_arc.addWidget(self.lbl_load)
             col_izq.addWidget(self.panel_archivos)
+
+            panel_status = QFrame()
+            panel_status.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 10px;")
+            lay_status = QVBoxLayout(panel_status)
+            uso = psutil.disk_usage(ruta).percent
+            txt_status = "ESTADO: ÓPTIMO" if uso < 80 else "ESTADO: CRÍTICO"
+            col_status = "#2ecc71" if uso < 80 else "#e74c3c"
+            msg_status = "Tienes espacio suficiente." if uso < 80 else "Debes vaciar espacio pronto."
             
+            lay_status.addWidget(QLabel(txt_status, styleSheet=f"color: {col_status}; font-weight: bold; font-size: 16px;"))
+            lay_status.addWidget(QLabel(msg_status, styleSheet="color: white;"))
+            lay_status.addStretch()
+            col_der.addWidget(panel_status)
+
             self.worker_disk = WorkerEscaneo(ruta)
             self.worker_disk.finalizado.connect(self.actualizar_archivos)
             self.worker_disk.start()
-
-            tips = QFrame()
-            tips.setFixedWidth(280)
-            tips.setStyleSheet("border: 1px solid #9b59b6; border-radius: 15px; background: #1a1a1a;")
-            lay_t = QVBoxLayout(tips)
-            lay_t.addWidget(QLabel("IA Advisor", styleSheet="color: #9b59b6; font-size: 18px; font-weight: bold;"))
-            
-            porcentaje_uso = psutil.disk_usage(ruta).percent
-            msg = "Disco saludable. El espacio libre permite una gestión de caché óptima." if porcentaje_uso < 70 else "Poco espacio libre detectado. Se recomienda limpieza."
-            
-            lbl_msg = QLabel(msg)
-            lbl_msg.setStyleSheet("color: white; font-size: 14px;")
-            lbl_msg.setWordWrap(True)
-            lay_t.addWidget(lbl_msg)
-            lay_t.addStretch()
-            
-            content_h.addLayout(col_izq, stretch=2)
-            content_h.addWidget(tips)
-            
         else:
-            col_izq.addWidget(QLabel(f"Monitor de {titulo}", styleSheet="color: white; font-size: 22px; font-weight: bold; margin-bottom: 5px;"))
+            # --- TÍTULO ARRIBA ---
+            lbl_tit = QLabel(f"Monitor: {titulo}")
+            lbl_tit.setStyleSheet("color: white; font-size: 20px; font-weight: bold; margin-bottom: 5px;")
+            lbl_tit.setMaximumHeight(35)
+            col_izq.addWidget(lbl_tit)
             
-            # Panel de KPIs
+            # --- PANEL KPI COMPACTO ---
             panel_kpi = QFrame()
             panel_kpi.setStyleSheet("background-color: #1a1a1a; border-radius: 12px; border: 1px solid #333;")
+            panel_kpi.setMaximumHeight(80) 
             lay_kpi = QHBoxLayout(panel_kpi)
-            lay_kpi.setContentsMargins(20, 15, 20, 15)
-            
-            # Cálculo de Uptime (Tiempo de uso del sistema)
+            lay_kpi.setContentsMargins(15, 5, 15, 5) 
+
             uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
             uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
 
@@ -195,37 +198,33 @@ class PantallaRecurso(QWidget):
             else:
                 mem = psutil.virtual_memory()
                 val_principal = f"{mem.percent}%"
-                
-                # --- CAMBIO AQUÍ: Uso Real / Total ---
-                usado = mem.used / (1024**3)
-                total = mem.total / (1024**3)
-                val_hardware = f"{usado:.1f} / {total:.1f} GB"
-                # -------------------------------------
-                
+                val_hardware = f"{mem.used/(1024**3):.1f} / {mem.total/(1024**3):.1f} GB"
                 lbl_desc = "Uso de RAM"
 
-            # Tarjeta 1: Carga/Uso
-            card1 = QVBoxLayout(); card1.addWidget(QLabel(lbl_desc, styleSheet="color: #888; font-size: 12px;"))
-            card1.addWidget(QLabel(val_principal, styleSheet="color: white; font-size: 26px; font-weight: bold;"))
-            
-            # Tarjeta 2: Hardware (Núcleos/Hilos o RAM Total)
-            card2 = QVBoxLayout(); card2.addWidget(QLabel("Hardware", styleSheet="color: #888; font-size: 12px;"))
-            card2.addWidget(QLabel(val_hardware, styleSheet="color: #3498db; font-size: 15px; font-weight: bold;"))
-            
-            # Tarjeta 3: Tiempo de uso (Uptime)
-            card3 = QVBoxLayout(); card3.addWidget(QLabel("Tiempo de Uso", styleSheet="color: #888; font-size: 12px;"))
-            card3.addWidget(QLabel(uptime_str, styleSheet="color: #f1c40f; font-size: 15px; font-weight: bold;"))
-
-            lay_kpi.addLayout(card1); lay_kpi.addLayout(card2); lay_kpi.addLayout(card3)
+            for t_tit, t_val, t_col in [
+                (lbl_desc, val_principal, "white"),
+                ("Hardware", val_hardware, "#3498db"),
+                ("Tiempo de Uso", uptime_str, "#f1c40f")
+            ]:
+                v_lay = QVBoxLayout()
+                v_lay.setSpacing(0)
+                v_lay.addWidget(QLabel(t_tit, styleSheet="color: #bbb; font-size: 11px;"))
+                v_lay.addWidget(QLabel(t_val, styleSheet=f"color: {t_col}; font-size: 16px; font-weight: bold;"))
+                lay_kpi.addLayout(v_lay)
             col_izq.addWidget(panel_kpi)
 
-            lbl_graph = QLabel("Histórico de rendimiento:")
-            lbl_graph.setStyleSheet("color: #666; font-size: 12px; margin-top: 10px;")
-            col_izq.addWidget(lbl_graph)
-            col_izq.addWidget(GraficaAnimada())
+            # --- GRÁFICA ---
+            self.grafica = GraficaAnimada()
+            self.grafica.setFixedHeight(180)
+            col_izq.addWidget(self.grafica)
+            
+            # ESTIRAMIENTO FINAL: Esto empuja todo lo anterior hacia arriba
+            col_izq.addStretch()
 
-            col_der = QVBoxLayout()
-            col_der.addWidget(QLabel("Procesos Activos", styleSheet="color: white; font-weight: bold; font-size: 16px;"))
+            # --- COLUMNA DERECHA (PROCESOS) ---
+            lbl_proc_tit = QLabel("Procesos Activos")
+            lbl_proc_tit.setStyleSheet("color: white; font-weight: bold; margin-top: 5px;")
+            col_der.addWidget(lbl_proc_tit)
             self.scroll = QScrollArea()
             self.scroll.setWidgetResizable(True)
             self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -233,29 +232,32 @@ class PantallaRecurso(QWidget):
             self.lay_procesos = QVBoxLayout(self.container_procesos)
             self.scroll.setWidget(self.container_procesos)
             col_der.addWidget(self.scroll)
-            
-            content_h.addLayout(col_izq, stretch=2)
-            content_h.addLayout(col_der, stretch=1)
 
+        content_h.addLayout(col_izq, stretch=2)
+        content_h.addLayout(col_der, stretch=1)
         layout_principal.addLayout(content_h)
+
+        # Recuadro morado para la IA al fondo
+        self.panel_ia = QFrame()
+        self.panel_ia.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
+        self.panel_ia.setFixedHeight(80)
+        layout_principal.addWidget(self.panel_ia)
 
     def refrescar_lista_procesos(self, lista):
         if not hasattr(self, 'lay_procesos'): return
         while self.lay_procesos.count():
             item = self.lay_procesos.takeAt(0)
             if item.widget(): item.widget().deleteLater()
-        
         for p in lista:
-            barra = BarraProcesoPro(p['name'][:15], p['cpu_percent'], 0, 20)
-            self.lay_procesos.addWidget(barra)
+            self.lay_procesos.addWidget(BarraProcesoPro(p['name'][:15], p['cpu_percent'], 0, 20))
         self.lay_procesos.addStretch()
 
     def actualizar_archivos(self, lista):
         if hasattr(self, 'lbl_load'): self.lbl_load.deleteLater()
         self.lay_arc.addWidget(QLabel("Archivos más grandes:", styleSheet="color: #9b59b6; font-weight: bold;"))
         for size, name in lista:
-            l = QLabel(f"- {name[:20]} ({size/(1024**3):.2f} GB)")
-            l.setStyleSheet("color: white; font-size: 12px; background: #252525; padding: 3px; border-radius: 4px;")
+            l = QLabel(f"- {name[:25]} ({size/(1024**3):.2f} GB)")
+            l.setStyleSheet("color: white; font-size: 12px; background: #252525; padding: 4px; border-radius: 4px;")
             self.lay_arc.addWidget(l)
         self.lay_arc.addStretch()
 
@@ -270,7 +272,6 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout()
         main_layout.setSpacing(0)
 
-        # 1. BARRA LATERAL
         self.sidebar_lay = QVBoxLayout()
         self.btn_inicio = QPushButton("Inicio")
         self.btn_cpu = QPushButton("CPU")
@@ -295,7 +296,6 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #f1f3f5; }
         """)
 
-        # 2. PÁGINAS
         self.paginas = QStackedWidget()
         self.p_inicio = self.crear_inicio()
         self.p_cpu = PantallaRecurso("CPU")
@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         layout_ini = QVBoxLayout(w)
         layout_ini.setContentsMargins(40, 40, 40, 40)
         
-        texto_ini = QLabel(
+        texto_html = (
             "<h1 style='color: white; font-size: 32px; margin-bottom: 10px;'>Monitor de Salud Inteligente</h1>"
             "<p style='font-size: 18px; color: #cccccc; line-height: 1.5;'>"
             "Bienvenido al panel de control. Este sistema supervisa tu hardware en tiempo real "
@@ -340,9 +340,17 @@ class MainWindow(QMainWindow):
             "</ul>"
             "</div>"
         )
-        texto_ini.setWordWrap(True)
-        layout_ini.addWidget(texto_ini)
+        
+        lbl_inicio = QLabel(texto_html)
+        lbl_inicio.setWordWrap(True)
+        layout_ini.addWidget(lbl_inicio)
         layout_ini.addStretch()
+
+        panel_ia_inicio = QFrame()
+        panel_ia_inicio.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
+        panel_ia_inicio.setFixedHeight(100)
+        layout_ini.addWidget(panel_ia_inicio)
+        
         return w
 
     def cambiar_pestaña_disco(self, ruta):
@@ -355,5 +363,5 @@ def init_ui():
      w = MainWindow(); w.show()
      sys.exit(app.exec())
 
-
-
+if __name__ == "__main__":
+    init_ui()
