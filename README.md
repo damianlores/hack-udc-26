@@ -14,3 +14,7 @@ La aplicación sigue un diseño modular dividido en cuatro componentes críticos
 ## CONCLUSIÓN
 
 Este trabajo demuestra la viabilidad de integrar modelos de lenguaje masivos (LLMs) en herramientas de sistema locales, logrando un equilibrio entre precisión técnica y accesibilidad. El uso de una arquitectura multihilo ha resultado fundamental, permitiendo que el procesamiento intensivo de la IA y el escaneo recursivo de archivos coexistan con una interfaz fluida y de baja latencia. En definitiva, el proyecto no solo optimiza el monitoreo de recursos, sino que establece un precedente sobre cómo la IA generativa puede actuar como una capa de interpretación crítica, transformando datos brutos en información estratégica y preventiva para el mantenimiento del hardware.
+
+### DEPENDENCIES
+
+Para poder ejecutar el código (main.py) se necesita las librerías: psutil, PyQt6, openai y dotenv
