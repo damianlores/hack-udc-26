@@ -17,4 +17,4 @@ Este trabajo demuestra la viabilidad de integrar modelos de lenguaje masivos (LL
 
 ### DEPENDENCIES
 
-Para poder ejecutar el código (main.py) se necesita las librerías: psutil, PyQt6, openai y dotenv
+Para poder ejecutar el código (main.py) se necesita las librerías: psutil, PyQt6, openai, dotenv y plyer.
