@@ -88,6 +88,7 @@ class ResourceHistoric:
             
             for p in m['procesos']:
                 text += f" {p['name']} CPU {p['cpu_percent']}% RAM {p['mem_percent']}MB\n"
-            # cleanup after building the text to avoid keeping old samples in memory
-            self.samples.clear()
+           
+        # cleanup after building the text to avoid keeping old samples in memory
+        self.samples.clear() 
         return text

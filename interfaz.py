@@ -32,44 +32,55 @@ class WorkerProcesses(QThread):
         context = "Sin contexto previo."
         message = "Recopilando datos para análisis de comportamiento..."
         response_historic = ""
+        
+        ai_counter = 0
+        ui_interval_ms = 2500  # 2.5 seconds for UI
+        ai_interval_target = 5000 # 5 seconds for AI
 
         while True:
             try:
                 # "light" data used for UI updates (top 10 processes)
                 processes_ui = obtain_processes_data()
-                # data collection for AI analysis
-                processes_ai = save_processes_data()
-                # call sample saving method of ResourceHistoric to store the current top 10 processes for AI analysis
-                resource_historic.save_sample(processes_ai[:10])
                 
-                # process historic of samples when ready (capacity reached)
-                if resource_historic.is_ready():
-                    # create sample set to send with AI prompt
-                    samples = resource_historic.build_samples()
+                ai_counter += ui_interval_ms
                 
-                    # build AI analysis
-                    response = analyze_samples(context, samples, self.api_key)
-                    context = response  # save context for next analysis to create a chain of insights based on behavior evolution
-                    message = response
+                if ai_counter >= ai_interval_target:
                     
-                    # get timestamp for response historic and join
-                    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-                    self.historic_ai.append(f"[{timestamp}] {response}")
+                    # data collection for AI analysis
+                    processes_ai = save_processes_data()
+                    # call sample saving method of ResourceHistoric to store the current top 10 processes for AI analysis
+                    resource_historic.save_sample(processes_ai[:10])
+                
+                    # process historic of samples when ready (capacity reached)
+                    if resource_historic.is_ready():
+                        # create sample set to send with AI prompt
+                        samples = resource_historic.build_samples()
                     
-                    # append joinage to full historic (popup)
-                    response_historic = "\n\n---\n\n".join(reversed(self.historic_ai))
+                        # build AI analysis
+                        response = analyze_samples(context, samples, self.api_key)
+                        context = response  # save context for next analysis to create a chain of insights based on behavior evolution
+                        message = response
+                        
+                        # get timestamp for response historic and join
+                        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                        self.historic_ai.append(f"[{timestamp}] {response}")
+                        
+                        # append joinage to full historic (popup)
+                        response_historic = "\n\n---\n\n".join(reversed(self.historic_ai))
 
-                    # notification system (detect ALERTA keyword in AI response to trigger a desktop notification, this is a simple implementation that can be expanded with more complex rules based on the content of the message)
-                    if "ALERTA:" in message.upper():
-                        from plyer import notification
-                        try:
-                            notification.notify(
-                                title='Monitor de Sistema',
-                                message=message[:100],
-                                timeout=10
-                            )
-                        except:
-                            pass
+                        # notification system (detect ALERTA keyword in AI response to trigger a desktop notification, this is a simple implementation that can be expanded with more complex rules based on the content of the message)
+                        if "ALERTA:" in message.upper():
+                            from plyer import notification
+                            try:
+                                notification.notify(
+                                    title='Monitor de Sistema',
+                                    message=message[:100],
+                                    timeout=10
+                                )
+                            except:
+                                pass
+                            
+                        ai_counter = 0  # reset AI counter after analysis
 
                 # emit signal with the data for UI update, AI message and full historic for popup
                 self.processes_data.emit(processes_ui, message, response_historic)
@@ -77,7 +88,7 @@ class WorkerProcesses(QThread):
             except Exception as e:
                 print(f"Error en WorkerProcesos: {e}")
             
-            self.msleep(5000)
+            self.msleep(ui_interval_ms)
 
 # Thread for big files scan
 class WorkerScan(QThread):
