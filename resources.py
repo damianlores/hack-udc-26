@@ -4,7 +4,7 @@ import time
 from collections import deque
 import datetime
 
-def save_process_data():
+def save_processes_data():
     # gets active processes with specific attributes
     attributes = ['pid', 'name', 'cpu_percent', 'memory_percent', 'memory_info', 'create_time']
     active_processes = list(psutil.process_iter(attributes))
@@ -42,7 +42,7 @@ def save_process_data():
     # return sorted list of processes by CPU usage, limited to top 10
     return sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
 
-def obtain_process_data():
+def obtain_processes_data():
     # similar to save_process_data but without sleep time as it will be regularly called by thread of execution, so it needs to be non-blocking
     processes = []
     
@@ -89,5 +89,5 @@ class ResourceHistoric:
             for p in m['procesos']:
                 text += f" {p['name']} CPU {p['cpu_percent']}% RAM {p['mem_percent']}MB\n"
             # cleanup after building the text to avoid keeping old samples in memory
-            self.samples = []
+            self.samples.clear()
         return text
