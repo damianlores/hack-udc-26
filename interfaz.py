@@ -25,7 +25,7 @@ class WorkerProcesses(QThread):
         self.historic_ai = deque(maxlen=10)
 
     def run(self):
-        from resources import obtain_process_data, save_process_data, ResourceHistoric
+        from resources import obtain_processes_data, save_processes_data, ResourceHistoric
         from ai import analyze_samples
         
         resource_historic = ResourceHistoric(capacity=5)
@@ -36,9 +36,9 @@ class WorkerProcesses(QThread):
         while True:
             try:
                 # "light" data used for UI updates (top 10 processes)
-                processes_ui = obtain_process_data()
+                processes_ui = obtain_processes_data()
                 # data collection for AI analysis
-                processes_ai = save_process_data()
+                processes_ai = save_processes_data()
                 # call sample saving method of ResourceHistoric to store the current top 10 processes for AI analysis
                 resource_historic.save_sample(processes_ai[:10])
                 
@@ -130,7 +130,7 @@ class bar_disk(QWidget):
         painter.drawText(x_ini, y_ini + height_b + 20, f"{self.used_gb:.1f}GB / {self.total_gb:.1f}GB ({self.percentage}%)")
 
 # graph widget for CPU and RAM
-class GraficaAnimada(QWidget):
+class AnimatedGraph(QWidget):
     def __init__(self, tipo="CPU"):
         super().__init__()
         self.tipo = tipo
@@ -261,12 +261,12 @@ class ScreenResource(QWidget):
                 
             col_izq.addWidget(panel_kpi)
 
-            self.graph = GraficaAnimada(tipo=title)
+            self.graph = AnimatedGraph(tipo=title)
             self.graph.setFixedHeight(180)
             col_izq.addWidget(self.graph)
             col_izq.addStretch()
 
-            # --- COLUMNA DERECHA (PROCESOS) ---
+            # right column
             lbl_proc_tit = QLabel("Procesos Activos")
             lbl_proc_tit.setStyleSheet("color: white; font-weight: bold; margin-top: 5px;")
             col_der.addWidget(lbl_proc_tit)
@@ -282,7 +282,7 @@ class ScreenResource(QWidget):
         content_h.addLayout(col_der, stretch=1)
         layout_main.addLayout(content_h)
 
-        # Panel inferior para la IA
+        # AI bottom panel
         self.panel_ai = QFrame()
         self.panel_ai.setStyleSheet("background-color: #121212; border: 1px solid #9b59b6; border-radius: 12px;")
         self.panel_ai.setFixedHeight(150)
@@ -290,10 +290,9 @@ class ScreenResource(QWidget):
         lay_ia = QVBoxLayout(self.panel_ai)
         
         self.label_ai = QTextEdit() 
-        self.label_ai.setReadOnly(True) # Impide que el usuario edite el contenido
+        self.label_ai.setReadOnly(True)
         self.label_ai.setPlainText("Esperando análisis de comportamiento...")
         
-        # 3. Estilo para simular un Label (sin bordes y fondo transparente)
         self.label_ai.setStyleSheet("""
             background: transparent; 
             border: none; 
@@ -302,7 +301,6 @@ class ScreenResource(QWidget):
             font-style: italic;
         """)
         
-        # Eliminar la barra de desplazamiento horizontal si no es necesaria
         self.label_ai.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         lay_ia.addWidget(self.label_ai)
@@ -311,13 +309,11 @@ class ScreenResource(QWidget):
     def refresh_process_list(self, lista, message):
         if not hasattr(self, 'lay_procesos'): return
         
-        # --- 1. ACTUALIZAR PANEL KPI ---
         uptime_seconds = int(datetime.datetime.now().timestamp() - psutil.boot_time())
         uptime_str = str(datetime.timedelta(seconds=uptime_seconds))
         self.lbl_val_uptime.setText(uptime_str)
 
         if self.title == "CPU":
-            # Usamos interval=None para no bloquear la interfaz
             val_principal = f"{psutil.cpu_percent(interval=None)}%"
             val_hardware = f"{psutil.cpu_count(logical=False)} núcleos / {psutil.cpu_count()} hilos"
         else:
@@ -328,16 +324,15 @@ class ScreenResource(QWidget):
         self.lbl_val_principal.setText(val_principal)
         self.lbl_val_hardware.setText(val_hardware)
 
-        # --- 2. ACTUALIZAR LISTADO DE PROCESOS ---
+        # update process list in UI
         while self.lay_procesos.count():
             item = self.lay_procesos.takeAt(0)
             if item.widget(): item.widget().deleteLater()
         for p in lista:
-            # Importante: Asegúrate de usar la clase correcta para las barras
             self.lay_procesos.addWidget(BarraProcesoPro(p['name'][:15], p['cpu_percent'], 0, 20))
         self.lay_procesos.addStretch()
         
-        # --- 3. ACTUALIZAR TEXTO DE LA IA ---
+        # update AI message panel
         if hasattr(self, 'label_ai'):
             self.label_ai.setPlainText(message)
             if "ALERTA:" in message.upper():
@@ -354,7 +349,7 @@ class ScreenResource(QWidget):
             self.lay_arc.addWidget(l)
         self.lay_arc.addStretch()
 
-
+# historic response popup
 class WindowHistoric(QDialog):
     def __init__(self, texto_historial, parent=None):
         super().__init__(parent)
@@ -378,7 +373,6 @@ class WindowHistoric(QDialog):
             }
         """)
         
-        # Auto-scroll al final
         cursor = self.texto.textCursor()
         cursor.movePosition(cursor.MoveOperation.Start)
         self.texto.setTextCursor(cursor)
@@ -390,9 +384,7 @@ class WindowHistoric(QDialog):
         btn_cerrar.setStyleSheet("background-color: #333; padding: 8px; color: white; border-radius: 5px;")
         layout.addWidget(btn_cerrar)
         
-        
-
-# --- VENTANA PRINCIPAL ---
+# main window 
 class MainWindow(QMainWindow):
     def __init__(self, api_key):
         super().__init__()
@@ -416,7 +408,6 @@ class MainWindow(QMainWindow):
         self.layout_sidebar.addWidget(self.button_cpu)
         self.layout_sidebar.addWidget(self.button_ram)
         
-
         for part in psutil.disk_partitions(all=False):
             if part.fstype in ('squashfs', 'tmpfs', ''): 
                 continue
